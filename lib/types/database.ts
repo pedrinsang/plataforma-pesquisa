@@ -5,6 +5,7 @@
 
 export type ProjectMemberRole = "owner" | "editor" | "viewer";
 export type ProjectMemberStatus = "accepted" | "pending";
+export type DatasetColumnType = "text" | "number" | "integer" | "date" | "boolean" | "categorical";
 
 export interface Database {
   public: {
@@ -130,6 +131,104 @@ export interface Database {
             columns: ["project_id"];
             isOneToOne: false;
             referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      datasets: {
+        Row: {
+          id: string;
+          project_id: string;
+          name: string;
+          description: string | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          name: string;
+          description?: string | null;
+          created_by: string;
+        };
+        Update: {
+          name?: string;
+          description?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "datasets_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      dataset_columns: {
+        Row: {
+          id: string;
+          dataset_id: string;
+          project_id: string;
+          name: string;
+          data_type: DatasetColumnType;
+          options: unknown;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          dataset_id: string;
+          project_id: string;
+          name: string;
+          data_type?: DatasetColumnType;
+          options?: unknown;
+          position?: number;
+        };
+        Update: {
+          name?: string;
+          data_type?: DatasetColumnType;
+          options?: unknown;
+          position?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "dataset_columns_dataset_id_fkey";
+            columns: ["dataset_id"];
+            isOneToOne: false;
+            referencedRelation: "datasets";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      dataset_rows: {
+        Row: {
+          id: string;
+          dataset_id: string;
+          project_id: string;
+          position: number;
+          data: Record<string, unknown>;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          dataset_id: string;
+          project_id: string;
+          position?: number;
+          data?: Record<string, unknown>;
+        };
+        Update: {
+          position?: number;
+          data?: Record<string, unknown>;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "dataset_rows_dataset_id_fkey";
+            columns: ["dataset_id"];
+            isOneToOne: false;
+            referencedRelation: "datasets";
             referencedColumns: ["id"];
           },
         ];
