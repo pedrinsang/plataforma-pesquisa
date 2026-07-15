@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ArrowLeft, FolderOpen } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 type Project = { id: string; title: string };
@@ -11,25 +12,27 @@ export function Sidebar({ projects }: { projects: Project[] }) {
   const activeProjectId = pathname.match(/^\/projects\/([^/]+)/)?.[1];
 
   return (
-    <nav className="flex w-60 shrink-0 flex-col gap-1 border-r border-zinc-200 p-3 dark:border-zinc-800">
+    <nav className="flex w-64 shrink-0 flex-col gap-0.5 border-r border-border-subtle bg-surface p-3">
       <Link
         href="/projects"
-        className="mb-2 rounded-md px-3 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+        className="mb-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-900/5 dark:text-zinc-400 dark:hover:bg-white/10"
       >
-        ← Todos os projetos
+        <ArrowLeft size={16} />
+        Todos os projetos
       </Link>
       {projects.map((project) => (
         <Link
           key={project.id}
           href={`/projects/${project.id}`}
           className={cn(
-            "truncate rounded-md px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800",
+            "flex items-center gap-2.5 truncate rounded-lg px-3 py-2 text-sm transition-colors",
             project.id === activeProjectId
-              ? "bg-blue-50 font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-              : "text-zinc-700 dark:text-zinc-300",
+              ? "bg-indigo-500/10 font-medium text-indigo-700 dark:text-indigo-300"
+              : "text-zinc-700 hover:bg-zinc-900/5 dark:text-zinc-300 dark:hover:bg-white/10",
           )}
         >
-          {project.title}
+          <FolderOpen size={16} className="shrink-0 opacity-70" />
+          <span className="truncate">{project.title}</span>
         </Link>
       ))}
     </nav>

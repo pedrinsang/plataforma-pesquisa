@@ -25,7 +25,7 @@ export default async function DatasetsPage({
           {datasets.map((ds) => (
             <Link key={ds.id} href={`/projects/${projectId}/statistics/datasets/${ds.id}`}>
               <Card className="h-full transition-shadow hover:shadow-md">
-                <h3 className="font-medium text-zinc-900 dark:text-zinc-50">{ds.name}</h3>
+                <h3 className="font-medium text-foreground">{ds.name}</h3>
                 {ds.description && (
                   <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{ds.description}</p>
                 )}

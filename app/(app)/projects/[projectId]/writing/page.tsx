@@ -1,5 +1,5 @@
-import Link from "next/link";
-import { Card } from "@/components/ui/Card";
+import { FileText, NotebookPen, BookOpen } from "lucide-react";
+import { AreaCard } from "@/components/layout/AreaCard";
 
 export default async function WritingAreaPage({
   params,
@@ -10,22 +10,27 @@ export default async function WritingAreaPage({
 
   return (
     <div className="grid gap-4 sm:grid-cols-3">
-      <Link href={`/projects/${projectId}/writing/documents`}>
-        <Card className="h-full transition-shadow hover:shadow-md">
-          <h3 className="font-medium text-zinc-900 dark:text-zinc-50">📄 Documentos</h3>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Textos, modelos e contador de palavras.
-          </p>
-        </Card>
-      </Link>
-      <Card>
-        <h3 className="font-medium text-zinc-900 dark:text-zinc-50">🗒️ Notas</h3>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Em breve.</p>
-      </Card>
-      <Card>
-        <h3 className="font-medium text-zinc-900 dark:text-zinc-50">📚 Referências</h3>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Em breve.</p>
-      </Card>
+      <AreaCard
+        href={`/projects/${projectId}/writing/documents`}
+        icon={FileText}
+        accent="amber"
+        title="Documentos"
+        description="Textos, modelos e contador de palavras."
+      />
+      <AreaCard
+        icon={NotebookPen}
+        accent="amber"
+        title="Notas"
+        description="Ideias soltas organizadas em cards."
+        comingSoon
+      />
+      <AreaCard
+        icon={BookOpen}
+        accent="amber"
+        title="Referências"
+        description="Bibliografia em ABNT, APA, Vancouver e MDT."
+        comingSoon
+      />
     </div>
   );
 }

@@ -21,7 +21,7 @@ export default async function ProjectLayout({
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
-      <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{project.title}</h1>
+      <h1 className="font-serif text-2xl font-semibold text-foreground">{project.title}</h1>
       <ProjectTabs projectId={project.id} />
       <div className="pt-4">{children}</div>
     </div>

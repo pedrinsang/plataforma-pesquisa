@@ -39,7 +39,7 @@ export function WordCountBadge({
           defaultValue={goal ?? ""}
           onBlur={(e) => saveGoal(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && saveGoal((e.target as HTMLInputElement).value)}
-          className="w-20 rounded border border-zinc-300 px-1 py-0.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="w-20 rounded-md border border-border-subtle bg-surface px-1 py-0.5 text-sm text-foreground"
         />
       ) : (
         <button type="button" onClick={() => setEditingGoal(true)} className="underline">

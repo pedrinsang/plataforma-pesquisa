@@ -31,7 +31,7 @@ export default async function DatasetDetailPage({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">{dataset.name}</h2>
+          <h2 className="font-serif text-lg font-medium text-foreground">{dataset.name}</h2>
           {dataset.description && (
             <p className="text-sm text-zinc-500 dark:text-zinc-400">{dataset.description}</p>
           )}

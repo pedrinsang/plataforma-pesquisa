@@ -18,7 +18,7 @@ export function Editor({
     editorProps: {
       attributes: {
         class:
-          "prose prose-zinc dark:prose-invert max-w-none min-h-[60vh] rounded-md border border-zinc-300 bg-white px-4 py-3 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900",
+          "prose prose-zinc dark:prose-invert prose-headings:font-serif max-w-none min-h-[60vh] rounded-xl border border-border-subtle bg-surface px-5 py-4 focus:outline-none",
       },
     },
     onCreate: ({ editor }) => {

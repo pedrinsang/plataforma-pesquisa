@@ -35,7 +35,7 @@ export function LoginForm({ infoMessage }: { infoMessage?: string }) {
       </Button>
       <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
         Ainda não tem conta?{" "}
-        <Link href="/signup" className="font-medium text-blue-600 hover:underline dark:text-blue-400">
+        <Link href="/signup" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
           Cadastre-se
         </Link>
       </p>

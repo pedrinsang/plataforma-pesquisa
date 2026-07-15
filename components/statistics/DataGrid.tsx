@@ -7,6 +7,7 @@ import { addColumn, addRow, deleteColumn, deleteRow, updateRowData } from "@/lib
 import type { DatasetColumnType } from "@/lib/types/database";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { useIsDarkMode } from "@/lib/utils/useIsDarkMode";
 
 type DatasetColumn = { id: string; name: string; data_type: DatasetColumnType; position: number };
 type DatasetRow = { id: string; data: Record<string, unknown> };
@@ -40,6 +41,7 @@ export function DataGrid({
   initialColumns: DatasetColumn[];
   initialRows: DatasetRow[];
 }) {
+  const isDark = useIsDarkMode();
   const [columns, setColumns] = useState(initialColumns);
   const [rows, setRows] = useState<GridRow[]>(() => toGridRows(initialRows, initialColumns));
   const [showAddColumn, setShowAddColumn] = useState(false);
@@ -132,7 +134,7 @@ export function DataGrid({
             <select
               value={newColumnType}
               onChange={(e) => setNewColumnType(e.target.value as DatasetColumnType)}
-              className="rounded-md border border-zinc-300 px-2 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="rounded-lg border border-border-subtle bg-surface px-2 py-2 text-sm text-foreground"
             >
               {Object.entries(COLUMN_TYPE_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -163,7 +165,7 @@ export function DataGrid({
             rows={rows}
             onRowsChange={handleRowsChange}
             rowKeyGetter={(row) => row.id}
-            className="rdg-light dark:rdg-dark"
+            className={isDark ? "rdg-dark" : "rdg-light"}
             style={{ blockSize: "auto", maxHeight: "70vh" }}
           />
           <div className="flex flex-wrap gap-2">

@@ -43,13 +43,13 @@ export function NewDocumentForm({ projectId }: { projectId: string }) {
               type="button"
               onClick={() => setTemplateId(id as DocumentTemplateId)}
               className={cn(
-                "rounded-md border p-3 text-left text-sm",
+                "rounded-lg border p-3 text-left text-sm transition-colors",
                 templateId === id
-                  ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-                  : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800",
+                  ? "border-indigo-500 bg-indigo-500/10"
+                  : "border-border-subtle hover:bg-zinc-900/5 dark:hover:bg-white/5",
               )}
             >
-              <div className="font-medium text-zinc-900 dark:text-zinc-50">{template.label}</div>
+              <div className="font-medium text-foreground">{template.label}</div>
               <div className="text-zinc-500 dark:text-zinc-400">{template.description}</div>
             </button>
           ))}
