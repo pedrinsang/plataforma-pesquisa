@@ -25,15 +25,10 @@ export async function createProject(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { data, error } = await supabase
-    .from("projects")
-    .insert({
-      owner_id: user.id,
-      title: parsed.data.title,
-      description: parsed.data.description || null,
-    })
-    .select("id")
-    .single();
+  const { data, error } = await supabase.rpc("create_project", {
+    p_title: parsed.data.title,
+    p_description: parsed.data.description || null,
+  });
 
   if (error || !data) {
     return { error: "Não foi possível criar o projeto. Tente novamente." };

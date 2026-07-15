@@ -104,6 +104,17 @@ export interface Database {
         Args: { p_project_id: string };
         Returns: boolean;
       };
+      create_project: {
+        Args: { p_title: string; p_description?: string | null };
+        Returns: {
+          id: string;
+          owner_id: string;
+          title: string;
+          description: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+      };
     };
     Enums: Record<string, never>;
   };
