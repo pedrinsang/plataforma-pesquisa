@@ -97,6 +97,43 @@ export interface Database {
           },
         ];
       };
+      documents: {
+        Row: {
+          id: string;
+          project_id: string;
+          title: string;
+          content_json: unknown;
+          template_type: string | null;
+          word_goal: number | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          title?: string;
+          content_json?: unknown;
+          template_type?: string | null;
+          word_goal?: number | null;
+          created_by: string;
+        };
+        Update: {
+          title?: string;
+          content_json?: unknown;
+          template_type?: string | null;
+          word_goal?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "documents_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {
