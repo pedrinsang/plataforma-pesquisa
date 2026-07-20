@@ -4,31 +4,198 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #fdfcfb;
-  --foreground: #1c1a17;
+  --background: #f4efe1;
+  --foreground: #191a1f;
   --surface: #ffffff;
-  --border-subtle: #e7e3dd;
+  --surface-dim: #ece4d0;
+  --border-subtle: #e2d9c2;
+  --border-strong: #d3c7a8;
+  --text-dim: #6b6252;
+  --accent-teal: #0f9585;
+  --accent-teal-soft: #12a3941a;
+  --accent-gold: #a9802f;
+  --accent-gold-soft: #a9802f1a;
+  --glow-a: rgba(18, 163, 148, 0.1);
+  --glow-b: rgba(169, 128, 47, 0.12);
+  --shadow-card: 0 1px 2px rgba(60, 50, 25, 0.05), 0 8px 24px -12px rgba(60, 50, 25, 0.14);
+  --shadow-lift: 0 2px 4px rgba(60, 50, 25, 0.06), 0 18px 40px -16px rgba(60, 50, 25, 0.22);
+  --ink-panel: #0a0f1c;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
+  --color-surface-dim: var(--surface-dim);
   --color-border-subtle: var(--border-subtle);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-serif: var(--font-source-serif);
+  --color-border-strong: var(--border-strong);
+  --color-text-dim: var(--text-dim);
+  --color-accent-teal: var(--accent-teal);
+  --color-accent-teal-soft: var(--accent-teal-soft);
+  --color-accent-gold: var(--accent-gold);
+  --color-accent-gold-soft: var(--accent-gold-soft);
+  --color-ink-panel: var(--ink-panel);
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
+  --font-serif: var(--font-fraunces);
 }
 
 .dark {
-  --background: #15130f;
-  --foreground: #f2ede4;
-  --surface: #1c1a15;
-  --border-subtle: #322e26;
+  --background: #070b14;
+  --foreground: #e9edf5;
+  --surface: #111a2b;
+  --surface-dim: #0b1120;
+  --border-subtle: #212d44;
+  --border-strong: #33415f;
+  --text-dim: #8592a8;
+  --accent-teal: #2fd9c4;
+  --accent-teal-soft: #2fd9c426;
+  --accent-gold: #d8ae5c;
+  --accent-gold-soft: #d8ae5c26;
+  --glow-a: rgba(47, 217, 196, 0.1);
+  --glow-b: rgba(216, 174, 92, 0.08);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -16px rgba(0, 0, 0, 0.6);
+  --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.35), 0 24px 50px -20px rgba(0, 0, 0, 0.7);
+  --ink-panel: #0b1220;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  position: relative;
+}
+
+/* Ambient depth: two faint glows anchored to opposite corners so the page
+   reads as a lit surface instead of a flat fill. Fixed + behind content. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(55rem 38rem at 82% -10%, var(--glow-a), transparent 68%),
+    radial-gradient(48rem 40rem at 4% 110%, var(--glow-b), transparent 66%);
+}
+
+/* Reusable surfaces --------------------------------------------------- */
+.panel-ink {
+  background: var(--ink-panel);
+  color: #e9edf5;
+}
+
+/* faint measurement grid, used to make "instrument" surfaces feel technical */
+.grid-teal {
+  background-image:
+    linear-gradient(to right, rgba(47, 217, 196, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(47, 217, 196, 0.14) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* ruled-paper texture for "manuscript" surfaces */
+.ruled-paper {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--accent-gold) 22%, transparent) 0,
+    color-mix(in srgb, var(--accent-gold) 22%, transparent) 1px,
+    transparent 1px,
+    transparent 30px
+  );
+}
+
+.shadow-card {
+  box-shadow: var(--shadow-card);
+}
+.shadow-lift {
+  box-shadow: var(--shadow-lift);
+}
+
+/* ---------------------------------------------------------------------
+   Motion: orchestrated hero sequence + scroll reveal.
+   Everything resolves to its final, settled state outside the
+   no-preference query, so reduced-motion users get the finished layout
+   instantly instead of a stuck mid-animation frame.
+   --------------------------------------------------------------------- */
+.anim-fade-up,
+.anim-draw,
+.anim-underline {
+  opacity: 1;
+}
+
+.anim-draw {
+  stroke-dashoffset: 0;
+}
+
+.anim-underline {
+  transform: scaleX(1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .anim-fade-up {
+    opacity: 0;
+    transform: translateY(16px);
+    animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: var(--delay, 0s);
+  }
+
+  .anim-draw {
+    stroke-dasharray: 1400;
+    stroke-dashoffset: 1400;
+    animation: draw-line 1.8s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+    animation-delay: var(--delay, 0s);
+  }
+
+  .anim-underline {
+    transform: scaleX(0);
+    transform-origin: left center;
+    animation: underline-draw 0.6s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+    animation-delay: var(--delay, 0s);
+  }
+
+  .anim-reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition:
+      opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .anim-reveal.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+
+  .anim-drift {
+    animation: drift 9s ease-in-out infinite;
+  }
+}
+
+@keyframes fade-up {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes draw-line {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes underline-draw {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
 }

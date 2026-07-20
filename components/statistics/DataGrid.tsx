@@ -160,25 +160,30 @@ export function DataGrid({
         </p>
       ) : (
         <>
-          <ReactDataGrid
-            columns={gridColumns}
-            rows={rows}
-            onRowsChange={handleRowsChange}
-            rowKeyGetter={(row) => row.id}
-            className={isDark ? "rdg-dark" : "rdg-light"}
-            style={{ blockSize: "auto", maxHeight: "70vh" }}
-          />
-          <div className="flex flex-wrap gap-2">
+          <div className="overflow-hidden rounded-xl border border-border-subtle shadow-card">
+            <ReactDataGrid
+              columns={gridColumns}
+              rows={rows}
+              onRowsChange={handleRowsChange}
+              rowKeyGetter={(row) => row.id}
+              className={isDark ? "rdg-dark" : "rdg-light"}
+              style={{ blockSize: "auto", maxHeight: "70vh" }}
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-[0.65rem] uppercase tracking-[0.2em] text-text-dim">
+              Colunas
+            </span>
             {columns.map((col) => (
               <span
                 key={col.id}
-                className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-1 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-surface-dim px-2.5 py-1 text-xs text-foreground"
               >
                 {col.name}
                 <button
                   type="button"
                   onClick={() => handleDeleteColumn(col.id)}
-                  className="text-zinc-400 hover:text-red-600"
+                  className="text-text-dim transition-colors hover:text-red-600"
                   title="Excluir coluna"
                 >
                   ✕

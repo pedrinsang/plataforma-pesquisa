@@ -45,7 +45,7 @@ export function NewDocumentForm({ projectId }: { projectId: string }) {
               className={cn(
                 "rounded-lg border p-3 text-left text-sm transition-colors",
                 templateId === id
-                  ? "border-indigo-500 bg-indigo-500/10"
+                  ? "border-accent-teal bg-accent-teal-soft"
                   : "border-border-subtle hover:bg-zinc-900/5 dark:hover:bg-white/5",
               )}
             >

@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { Trash2 } from "lucide-react";
 import { Editor } from "@/components/writing/Editor";
 import { WordCountBadge } from "@/components/writing/WordCountBadge";
 import { updateDocumentContent, updateDocumentTitle, deleteDocument } from "@/lib/actions/documents";
-import { Input } from "@/components/ui/Input";
-import { Button } from "@/components/ui/Button";
+import { cn } from "@/lib/utils/cn";
 
 function countWords(text: string) {
   const trimmed = text.trim();
@@ -53,29 +53,50 @@ export function DocumentEditor({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-4">
-        <Input
+    <div className="space-y-6">
+      {/* Barra do editor: título + estado, gruda no topo ao rolar */}
+      <div className="sticky top-16 z-20 -mx-1 flex flex-wrap items-center gap-3 rounded-xl border border-border-subtle bg-surface/85 px-4 py-2.5 backdrop-blur-md">
+        <input
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
-          className="max-w-md text-lg font-medium"
+          placeholder="Documento sem título"
+          className="min-w-0 flex-1 bg-transparent font-serif text-lg font-semibold text-foreground placeholder:text-text-dim/60 focus:outline-none"
         />
-        <Button
-          variant="danger"
-          onClick={() => {
-            if (confirm("Excluir este documento?")) deleteDocument(documentId, projectId);
-          }}
-        >
-          Excluir
-        </Button>
+        <div className="flex items-center gap-3">
+          <span
+            className={cn(
+              "flex items-center gap-1.5 font-mono text-[0.7rem] uppercase tracking-wide",
+              saveStatus === "saving" ? "text-accent-gold" : "text-text-dim",
+            )}
+          >
+            <span
+              className={cn(
+                "size-1.5 rounded-full",
+                saveStatus === "saving" ? "animate-pulse bg-accent-gold" : "bg-accent-teal",
+              )}
+            />
+            {saveStatus === "saving" ? "Salvando" : "Salvo"}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm("Excluir este documento?")) deleteDocument(documentId, projectId);
+            }}
+            aria-label="Excluir documento"
+            title="Excluir documento"
+            className="rounded-lg p-1.5 text-text-dim transition-colors hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
       </div>
-      <div className="flex items-center justify-between">
-        <WordCountBadge documentId={documentId} wordCount={wordCount} initialGoal={initialWordGoal} />
-        <span className="text-xs text-zinc-400 dark:text-zinc-500">
-          {saveStatus === "saving" ? "Salvando..." : "Salvo"}
-        </span>
+
+      <div className="mx-auto max-w-3xl">
+        <div className="mb-3 flex justify-end">
+          <WordCountBadge documentId={documentId} wordCount={wordCount} initialGoal={initialWordGoal} />
+        </div>
+        <Editor content={initialContent} onUpdate={handleEditorUpdate} />
       </div>
-      <Editor content={initialContent} onUpdate={handleEditorUpdate} />
     </div>
   );
 }

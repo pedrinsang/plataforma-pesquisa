@@ -1,11 +1,15 @@
 import { cn } from "@/lib/utils/cn";
-import type { InputHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 
 const FIELD_CLASSES =
-  "w-full rounded-lg border border-border-subtle bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-400 transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:placeholder:text-zinc-500";
+  "w-full rounded-lg border border-border-subtle bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-400 transition-colors focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal dark:placeholder:text-zinc-500";
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={cn(FIELD_CLASSES, className)} {...props} />;
+}
+
+export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+  return <select className={cn(FIELD_CLASSES, className)} {...props} />;
 }
 
 export function Textarea({

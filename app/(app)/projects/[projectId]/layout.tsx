@@ -20,10 +20,18 @@ export default async function ProjectLayout({
   if (!project) notFound();
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4">
-      <h1 className="font-serif text-2xl font-semibold text-foreground">{project.title}</h1>
-      <ProjectTabs projectId={project.id} />
-      <div className="pt-4">{children}</div>
+    <div className="mx-auto max-w-5xl">
+      <div className="flex items-center gap-2 font-mono text-[0.7rem] uppercase tracking-[0.2em] text-text-dim">
+        <span className="size-1.5 rounded-full bg-accent-teal" />
+        Workspace do projeto
+      </div>
+      <h1 className="mt-2 font-serif text-3xl font-semibold tracking-tight text-foreground">
+        {project.title}
+      </h1>
+      <div className="mt-5">
+        <ProjectTabs projectId={project.id} />
+      </div>
+      <div className="pt-7">{children}</div>
     </div>
   );
 }

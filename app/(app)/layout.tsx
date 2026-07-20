@@ -21,7 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Navbar email={user.email ?? ""} />
       <div className="flex flex-1">
         <Sidebar projects={projects ?? []} />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto px-5 py-8 sm:px-8 lg:px-10">{children}</main>
       </div>
     </div>
   );

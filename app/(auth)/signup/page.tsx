@@ -1,11 +1,22 @@
+import Link from "next/link";
 import { Card } from "@/components/ui/Card";
+import { AppMark } from "@/components/layout/AppMark";
 import { SignupForm } from "./SignupForm";
 
 export default function SignupPage() {
   return (
     <div className="flex min-h-full flex-1 items-center justify-center p-6">
       <div className="w-full max-w-sm">
-        <h1 className="mb-6 text-center font-serif text-2xl font-semibold text-foreground">
+        <Link href="/" className="mb-8 flex items-center justify-center gap-2.5">
+          <AppMark size={30} />
+          <span className="font-mono text-[0.7rem] font-medium uppercase tracking-[0.22em] text-foreground">
+            Plataforma <span className="text-text-dim">/ Pesquisa</span>
+          </span>
+        </Link>
+        <p className="text-center font-mono text-[0.7rem] uppercase tracking-[0.2em] text-text-dim">
+          Comece de graça
+        </p>
+        <h1 className="mb-6 mt-2 text-center font-serif text-3xl font-semibold text-foreground">
           Criar conta
         </h1>
         <Card>

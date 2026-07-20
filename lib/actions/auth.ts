@@ -13,12 +13,24 @@ export async function signIn(
   const password = String(formData.get("password") ?? "");
 
   const supabase = await createClient();
+
+  const { data: rateLimit } = await supabase
+    .rpc("check_login_rate_limit", { p_email: email })
+    .single<{ allowed: boolean; retry_after_seconds: number }>();
+
+  if (rateLimit && !rateLimit.allowed) {
+    const minutes = Math.ceil(rateLimit.retry_after_seconds / 60);
+    return { error: `Muitas tentativas. Tente novamente em ${minutes} min.` };
+  }
+
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
+    await supabase.rpc("register_login_failure", { p_email: email });
     return { error: "E-mail ou senha inválidos." };
   }
 
+  await supabase.rpc("register_login_success", { p_email: email });
   redirect("/projects");
 }
 
