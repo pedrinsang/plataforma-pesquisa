@@ -3,199 +3,430 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-:root {
-  --background: #f4efe1;
-  --foreground: #191a1f;
-  --surface: #ffffff;
-  --surface-dim: #ece4d0;
-  --border-subtle: #e2d9c2;
-  --border-strong: #d3c7a8;
-  --text-dim: #6b6252;
-  --accent-teal: #0f9585;
-  --accent-teal-soft: #12a3941a;
-  --accent-gold: #a9802f;
-  --accent-gold-soft: #a9802f1a;
-  --glow-a: rgba(18, 163, 148, 0.1);
-  --glow-b: rgba(169, 128, 47, 0.12);
-  --shadow-card: 0 1px 2px rgba(60, 50, 25, 0.05), 0 8px 24px -12px rgba(60, 50, 25, 0.14);
-  --shadow-lift: 0 2px 4px rgba(60, 50, 25, 0.06), 0 18px 40px -16px rgba(60, 50, 25, 0.22);
-  --ink-panel: #0a0f1c;
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPASSO — design system
+   Editorial "manuscrito × instrumento": tipografia serifada (Cormorant
+   Garamond sobre Lora), superfícies de papel quase-branco, régua fina como
+   estrutura, cor aplicada como traço (não preenchimento). Acento petróleo
+   (#146b74). Derivado do design system "Classical" no Claude Design.
+
+   Camadas:
+   1. @theme  — paleta bruta em --color-* (petróleo, rampas, neutros), fontes
+                e raios. Emite as variáveis em :root E gera os utilitários
+                Tailwind (bg-accent, text-accent-700, etc.).
+   2. .dark   — sobrescreve as --color-* para o modo escuro; os utilitários,
+                por referenciarem var(--color-*), herdam automaticamente.
+   3. :root   — escala de espaçamento e sombras usadas pelas classes de
+                componente (fora do @theme para não mexer na escala do Tailwind).
+   4. Camada de componentes (.btn, .card, .tag, .input, .seg, .navlink…) e
+                animações — copiadas/adaptadas dos mockups.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@theme {
+  /* — chão e tinta (claro) — */
+  --color-bg: #e9e8e6;
+  --color-surface: #f8f7f5;
+  --color-text: #201f1d;
+  --color-divider: color-mix(in srgb, #201f1d 14%, transparent);
+
+  /* — acento petróleo + rampa (100 claro → 900 escuro) — */
+  --color-accent: #146b74;
+  --color-accent-100: #e4f1f2;
+  --color-accent-200: #c2e2e4;
+  --color-accent-300: #94cdd1;
+  --color-accent-400: #5aa6ad;
+  --color-accent-500: #2b858f;
+  --color-accent-600: #0f5b63;
+  --color-accent-700: #0d4d54;
+  --color-accent-800: #0a3a40;
+  --color-accent-900: #072a2f;
+
+  /* — neutros quentes — */
+  --color-neutral-100: #f4f2f0;
+  --color-neutral-200: #eae7e4;
+  --color-neutral-300: #d8d4cf;
+  --color-neutral-400: #bab6b1;
+  --color-neutral-500: #9b9792;
+  --color-neutral-600: #7d7974;
+  --color-neutral-700: #605d59;
+  --color-neutral-800: #444140;
+  --color-neutral-900: #2d2b2a;
+
+  /* — sinal (positivo/negativo em métricas) — */
+  --color-pos: #3f7d5a;
+  --color-neg: #a85b3f;
+
+  /* — aliases semânticos (compatibilidade com telas ainda não redesenhadas) — */
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-text);
+  --color-surface-dim: #efedea;
+  --color-border-subtle: var(--color-divider);
+  --color-border-strong: color-mix(in srgb, #201f1d 26%, transparent);
+  --color-text-dim: color-mix(in srgb, var(--color-text) 62%, transparent);
+  --color-accent-teal: var(--color-accent);
+  --color-accent-teal-soft: var(--color-accent-100);
+  --color-accent-gold: #9a7636;
+  --color-accent-gold-soft: color-mix(in srgb, #9a7636 12%, transparent);
+  /* painel-instrumento (.panel-ink): claro = superfície fria "blueprint",
+     escuro = tinta. Os tokens de texto/borda ficam em :root/.dark abaixo. */
+  --color-ink-panel: #e2e9e8;
+
+  /* — tipografia — */
+  --font-sans: var(--font-lora), Georgia, "Times New Roman", serif;
+  --font-serif: var(--font-cormorant), Georgia, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-heading: var(--font-cormorant), Georgia, serif;
+  --font-body: var(--font-lora), Georgia, "Times New Roman", serif;
+  --font-hand: var(--font-caveat), "Segoe Script", cursive;
+
+  /* — raios — */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 7px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-surface: var(--surface);
-  --color-surface-dim: var(--surface-dim);
-  --color-border-subtle: var(--border-subtle);
-  --color-border-strong: var(--border-strong);
-  --color-text-dim: var(--text-dim);
-  --color-accent-teal: var(--accent-teal);
-  --color-accent-teal-soft: var(--accent-teal-soft);
-  --color-accent-gold: var(--accent-gold);
-  --color-accent-gold-soft: var(--accent-gold-soft);
-  --color-ink-panel: var(--ink-panel);
-  --font-sans: var(--font-plex-sans);
-  --font-mono: var(--font-plex-mono);
-  --font-serif: var(--font-fraunces);
+/* Escala de espaçamento (densidade 1.15×) e sombras — usadas pelas classes de
+   componente. Ficam fora do @theme para não colidir com a escala do Tailwind. */
+:root {
+  --space-1: 4.6px;
+  --space-2: 9.2px;
+  --space-3: 13.8px;
+  --space-4: 18.4px;
+  --space-6: 27.6px;
+  --space-8: 36.8px;
+
+  --elev-sm: 0 1px 2px color-mix(in srgb, #2d2b2b 14%, transparent);
+  --elev-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
+  --elev-lg: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
+
+  --shadow-card: 0 1px 2px rgba(40, 36, 30, 0.05), 0 8px 24px -12px rgba(40, 36, 30, 0.14);
+  --shadow-lift: 0 2px 4px rgba(40, 36, 30, 0.06), 0 18px 40px -16px rgba(40, 36, 30, 0.2);
+
+  /* tinta do papel manuscrito (área de escrita) e do painel-instrumento */
+  --paper: #fbf9f4;
+  --paper-rule: rgba(154, 118, 54, 0.09);
+
+  /* texto/borda do painel-instrumento (.panel-ink) — modo claro */
+  --ink-text: #14201f;
+  --ink-dim: color-mix(in srgb, #14201f 52%, transparent);
+  --ink-border: color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 
 .dark {
-  --background: #070b14;
-  --foreground: #e9edf5;
-  --surface: #111a2b;
-  --surface-dim: #0b1120;
-  --border-subtle: #212d44;
-  --border-strong: #33415f;
-  --text-dim: #8592a8;
-  --accent-teal: #2fd9c4;
-  --accent-teal-soft: #2fd9c426;
-  --accent-gold: #d8ae5c;
-  --accent-gold-soft: #d8ae5c26;
-  --glow-a: rgba(47, 217, 196, 0.1);
-  --glow-b: rgba(216, 174, 92, 0.08);
+  --color-bg: #181c1d;
+  --color-surface: #232829;
+  --color-text: #eceae7;
+  --color-divider: rgba(236, 234, 231, 0.15);
+
+  --color-accent: #5bb8c2;
+  --color-accent-100: rgba(91, 184, 194, 0.16);
+  --color-accent-200: rgba(91, 184, 194, 0.3);
+  --color-accent-300: rgba(91, 184, 194, 0.45);
+  --color-accent-400: #4fb0ba;
+  --color-accent-500: #6ac2cb;
+  --color-accent-600: #7fcdd5;
+  --color-accent-700: #a6dde3;
+  --color-accent-800: #c9ecef;
+  --color-accent-900: #e4f6f8;
+
+  --color-neutral-100: rgba(236, 234, 231, 0.07);
+  --color-neutral-200: rgba(236, 234, 231, 0.1);
+  --color-neutral-300: rgba(236, 234, 231, 0.18);
+  --color-neutral-400: rgba(236, 234, 231, 0.32);
+  --color-neutral-500: #9b9792;
+  --color-neutral-600: #b0aca7;
+  --color-neutral-700: #c2beb9;
+  --color-neutral-800: #cfccc8;
+  --color-neutral-900: #eceae7;
+
+  --color-pos: #6fbf8f;
+  --color-neg: #d98b6a;
+
+  --color-surface-dim: #1f2526;
+  --color-border-strong: rgba(236, 234, 231, 0.28);
+  --color-accent-gold: #d8ae5c;
+  --color-accent-gold-soft: color-mix(in srgb, #d8ae5c 16%, transparent);
+
+  --elev-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --elev-md: 0 4px 14px rgba(0, 0, 0, 0.5);
+  --elev-lg: 0 14px 36px rgba(0, 0, 0, 0.6);
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -16px rgba(0, 0, 0, 0.6);
   --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.35), 0 24px 50px -20px rgba(0, 0, 0, 0.7);
-  --ink-panel: #0b1220;
+
+  --paper: #201f1c;
+  --paper-rule: rgba(216, 174, 92, 0.12);
+
+  /* painel-instrumento — modo escuro (tinta) */
+  --color-ink-panel: #12181a;
+  --ink-text: #eceae7;
+  --ink-dim: #8592a8;
+  --ink-border: transparent;
 }
 
+/* Ilha de tema claro. As simulações de "papel/manuscrito" (landing) devem
+   manter a aparência do modo claro mesmo com a página no escuro — senão o
+   papel escureceria e o texto (que herda --color-text claro) sumiria. Esta
+   classe reverte, no escopo do card, os tokens de cor para os valores claros
+   do @theme; os derivados (--color-text-dim, --color-foreground,
+   --color-border-subtle, --color-accent-teal) recalculam sozinhos. As sombras
+   (--elev-*) ficam herdadas do tema ambiente, dando profundidade ao papel
+   claro sobre o fundo escuro. Em modo claro os valores coincidem — é inócua. */
+.paper-light {
+  --color-bg: #e9e8e6;
+  --color-surface: #f8f7f5;
+  --color-text: #201f1d;
+  --color-divider: color-mix(in srgb, #201f1d 14%, transparent);
+
+  --color-accent: #146b74;
+  --color-accent-100: #e4f1f2;
+  --color-accent-200: #c2e2e4;
+  --color-accent-300: #94cdd1;
+  --color-accent-400: #5aa6ad;
+  --color-accent-500: #2b858f;
+  --color-accent-600: #0f5b63;
+  --color-accent-700: #0d4d54;
+  --color-accent-800: #0a3a40;
+  --color-accent-900: #072a2f;
+
+  --color-neutral-100: #f4f2f0;
+  --color-neutral-200: #eae7e4;
+  --color-neutral-300: #d8d4cf;
+  --color-neutral-400: #bab6b1;
+  --color-neutral-500: #9b9792;
+  --color-neutral-600: #7d7974;
+  --color-neutral-700: #605d59;
+  --color-neutral-800: #444140;
+  --color-neutral-900: #2d2b2a;
+
+  --color-pos: #3f7d5a;
+  --color-neg: #a85b3f;
+
+  --color-surface-dim: #efedea;
+  --color-border-strong: color-mix(in srgb, #201f1d 26%, transparent);
+  --color-accent-gold: #9a7636;
+  --color-accent-gold-soft: color-mix(in srgb, #9a7636 12%, transparent);
+
+  /* Aliases semânticos derivados — explicitados. Utilitários como
+     text-foreground/text-text-dim/border-border-subtle leem estes aliases, que
+     no dark NÃO recalculam sozinhos só com o override de --color-text/-divider
+     acima (foi o que apagou o título do card manuscrito). */
+  --color-background: #e9e8e6;
+  --color-foreground: #201f1d;
+  --color-border-subtle: color-mix(in srgb, #201f1d 14%, transparent);
+  --color-text-dim: color-mix(in srgb, #201f1d 62%, transparent);
+  --color-accent-teal: #146b74;
+  --color-accent-teal-soft: #e4f1f2;
+
+  --paper: #fbf9f4;
+  --paper-rule: rgba(154, 118, 54, 0.09);
+
+  color: var(--color-text);
+}
+
+/* ─────────────────────────────  base  ───────────────────────────── */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
-  position: relative;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+}
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 24%, transparent);
+}
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
-/* Ambient depth: two faint glows anchored to opposite corners so the page
-   reads as a lit surface instead of a flat fill. Fixed + behind content. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(55rem 38rem at 82% -10%, var(--glow-a), transparent 68%),
-    radial-gradient(48rem 40rem at 4% 110%, var(--glow-b), transparent 66%);
-}
+/* ─────────────────────  superfícies reutilizáveis  ───────────────── */
+.shadow-card { box-shadow: var(--shadow-card); }
+.shadow-lift { box-shadow: var(--shadow-lift); }
+.elev-sm { box-shadow: var(--elev-sm); }
+.elev-md { box-shadow: var(--elev-md); }
+.elev-lg { box-shadow: var(--elev-lg); }
 
-/* Reusable surfaces --------------------------------------------------- */
+/* papel pautado — área de escrita/manuscrito */
+.ruled-paper {
+  background-color: var(--paper);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 29px,
+    var(--paper-rule) 29px,
+    var(--paper-rule) 30px
+  );
+}
+/* painel-instrumento escuro com grade técnica — área de estatística/dados */
 .panel-ink {
-  background: var(--ink-panel);
-  color: #e9edf5;
+  background: var(--color-ink-panel);
+  color: var(--ink-text);
 }
-
-/* faint measurement grid, used to make "instrument" surfaces feel technical */
 .grid-teal {
   background-image:
-    linear-gradient(to right, rgba(47, 217, 196, 0.14) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(47, 217, 196, 0.14) 1px, transparent 1px);
+    linear-gradient(to right, color-mix(in srgb, var(--color-accent) 22%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--color-accent) 22%, transparent) 1px, transparent 1px);
   background-size: 22px 22px;
 }
 
-/* ruled-paper texture for "manuscript" surfaces */
-.ruled-paper {
-  background-image: repeating-linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--accent-gold) 22%, transparent) 0,
-    color-mix(in srgb, var(--accent-gold) 22%, transparent) 1px,
-    transparent 1px,
-    transparent 30px
-  );
+/* ──────────────────────────  botões  ─────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  cursor: pointer; text-decoration: none; white-space: nowrap;
+  font-family: var(--font-heading); font-weight: 600; font-size: 14px; line-height: 1.2;
+  color: var(--color-text);
+  background: transparent; border: 1px solid transparent;
+  padding: var(--space-2) calc(var(--space-3) * 1.2);
+  border-radius: var(--radius-md);
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+.btn svg { display: block; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { color: var(--color-accent); border-color: var(--color-accent); }
+.btn-primary:hover { background: color-mix(in srgb, var(--color-accent) 12%, transparent); }
+.btn-primary:active { background: color-mix(in srgb, var(--color-accent) 22%, transparent); }
+.btn-secondary { border-color: var(--color-divider); }
+.btn-secondary:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.btn-secondary:active { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
+.btn-ghost { color: var(--color-accent); padding-inline: var(--space-2); }
+.btn-ghost:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+.btn-ghost:active { background: color-mix(in srgb, var(--color-accent) 18%, transparent); }
+.btn-danger { color: var(--color-neg); border-color: color-mix(in srgb, var(--color-neg) 55%, transparent); }
+.btn-danger:hover { background: color-mix(in srgb, var(--color-neg) 12%, transparent); }
+.btn-icon { width: 36px; height: 36px; padding: 0; }
+.btn-block { width: 100%; }
+
+/* ──────────────────────────  tags  ───────────────────────────────── */
+.tag {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 11px;
+  letter-spacing: 0.02em; padding: 3px 10px; white-space: nowrap;
+  border-radius: calc(var(--radius-md) * 0.75); border: 1px solid transparent;
+}
+.tag-accent { background: var(--color-accent-100); color: var(--color-accent-800); }
+.tag-neutral { background: var(--color-neutral-200); color: var(--color-neutral-800); }
+.tag-outline { border-color: var(--color-accent); color: var(--color-accent-700); }
+
+/* ──────────────────────────  cards  ──────────────────────────────── */
+.card {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-3); border-radius: var(--radius-md);
+  background: var(--color-surface); border: 1px solid var(--color-divider);
+}
+.card-kicker { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-accent-700); }
+.card-title { font-family: var(--font-heading); font-weight: 600; font-size: 17px; line-height: 1.2; }
+.card-body { margin: 0; font-size: 13px; opacity: 0.8; flex: 1; }
+.card-meta {
+  display: flex; align-items: center; gap: 6px; font-size: 11px;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.mcard { transition: transform 0.18s ease, box-shadow 0.18s ease; }
+.mcard:hover { transform: translateY(-2px); box-shadow: var(--elev-md); }
+
+/* ──────────────────────────  formulários  ────────────────────────── */
+.field > label {
+  display: block; font-size: 12px; margin-bottom: 5px;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+.input {
+  width: 100%; min-height: 36px; padding: 6px 10px; font: inherit;
+  font-size: 14px; color: var(--color-text); caret-color: var(--color-accent);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+  transition: border-color 0.16s ease;
+}
+.input::placeholder { color: color-mix(in srgb, var(--color-text) 45%, transparent); }
+.input:hover { border-color: color-mix(in srgb, var(--color-text) 40%, transparent); }
+.input:focus-visible { border-color: var(--color-accent); outline: none; }
+textarea.input { min-height: 90px; resize: vertical; }
+
+.seg {
+  display: inline-flex; overflow: hidden;
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+}
+.seg-opt {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; font-size: 13px; cursor: pointer; user-select: none;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.seg-opt + .seg-opt { border-left: 1px solid var(--color-divider); }
+.seg-opt[data-active="true"] { color: var(--color-accent); box-shadow: inset 0 0 0 1px var(--color-accent); }
+.seg-opt:not([data-active="true"]):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+
+/* ─────────────────────  navegação (sidebar)  ─────────────────────── */
+.navlink {
+  display: flex; align-items: center; gap: 11px; padding: 9px 12px;
+  border-radius: var(--radius-md); color: var(--color-text); text-decoration: none;
+  font-family: var(--font-body); font-size: 14px; position: relative;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.navlink:hover { background: color-mix(in srgb, var(--color-accent) 9%, transparent); color: var(--color-accent-700); }
+.navlink[aria-current="page"] { background: var(--color-accent-100); color: var(--color-accent-700); }
+.navlink[aria-current="page"]::before {
+  content: ""; position: absolute; left: -8px; top: 8px; bottom: 8px;
+  width: 2px; background: var(--color-accent); border-radius: 2px;
 }
 
-.shadow-card {
-  box-shadow: var(--shadow-card);
+/* botão-ícone circular (topbar) */
+.ib {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid var(--color-divider); color: var(--color-text);
+  cursor: pointer; background: transparent;
+  transition: background 0.16s ease, color 0.16s ease;
 }
-.shadow-lift {
-  box-shadow: var(--shadow-lift);
-}
+.ib:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); color: var(--color-accent-700); }
 
-/* ---------------------------------------------------------------------
-   Motion: orchestrated hero sequence + scroll reveal.
-   Everything resolves to its final, settled state outside the
-   no-preference query, so reduced-motion users get the finished layout
-   instantly instead of a stuck mid-animation frame.
-   --------------------------------------------------------------------- */
-.anim-fade-up,
-.anim-draw,
-.anim-underline {
-  opacity: 1;
-}
+/* linha da timeline */
+.tlrow { transition: background 0.16s ease; }
+.tlrow:hover { background: color-mix(in srgb, var(--color-accent) 5%, transparent); }
 
-.anim-draw {
-  stroke-dashoffset: 0;
-}
+/* caligrafia (landing) */
+.hand { font-family: var(--font-hand); }
 
-.anim-underline {
-  transform: scaleX(1);
-}
+/* régua fina */
+.hr { height: 1px; border: 0; margin: var(--space-4) 0; background: var(--color-divider); }
+
+/* ──────────────────────  animações de scroll  ────────────────────── */
+/* Estado final assentado por padrão: quem usa prefers-reduced-motion recebe o
+   layout pronto, sem frame preso. As transições só entram no no-preference. */
+.reveal { opacity: 1; transform: none; }
+.floaty { animation: none; }
 
 @media (prefers-reduced-motion: no-preference) {
-  .anim-fade-up {
+  .reveal {
     opacity: 0;
-    transform: translateY(16px);
-    animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    animation-delay: var(--delay, 0s);
+    transform: translateY(22px);
+    transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
   }
+  .reveal[data-axis="left"] { transform: translateX(-18px); }
+  .reveal[data-axis="right"] { transform: translateX(18px); }
+  .reveal.is-visible { opacity: 1; transform: none; }
+  .floaty { animation: floaty 9s ease-in-out infinite; }
 
-  .anim-draw {
-    stroke-dasharray: 1400;
-    stroke-dashoffset: 1400;
-    animation: draw-line 1.8s cubic-bezier(0.65, 0, 0.35, 1) forwards;
-    animation-delay: var(--delay, 0s);
-  }
-
-  .anim-underline {
-    transform: scaleX(0);
-    transform-origin: left center;
-    animation: underline-draw 0.6s cubic-bezier(0.65, 0, 0.35, 1) forwards;
-    animation-delay: var(--delay, 0s);
-  }
-
-  .anim-reveal {
-    opacity: 0;
-    transform: translateY(24px);
-    transition:
-      opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
-      transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  .anim-reveal.is-visible {
-    opacity: 1;
-    transform: none;
-  }
-
-  .anim-drift {
-    animation: drift 9s ease-in-out infinite;
-  }
+  /* legado: usado pelo componente <Reveal> */
+  .anim-reveal { opacity: 0; transform: translateY(24px);
+    transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+  .anim-reveal.is-visible { opacity: 1; transform: none; }
 }
 
-@keyframes fade-up {
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
+@keyframes floaty { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 
-@keyframes draw-line {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-@keyframes underline-draw {
-  to {
-    transform: scaleX(1);
-  }
-}
-
-@keyframes drift {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
+/* ─────────────────────  transição de tema (claro↔escuro)  ────────────
+   O ThemeToggle troca as classes dentro de document.startViewTransition,
+   então o navegador faz um crossfade da página inteira entre os dois temas.
+   Sob prefers-reduced-motion o toggle nem inicia a transição (troca direto). */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.38s;
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
   }
 }

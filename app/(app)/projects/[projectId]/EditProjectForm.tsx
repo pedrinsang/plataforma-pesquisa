@@ -22,11 +22,11 @@ export function EditProjectForm({
 
   return (
     <form action={formAction} className="space-y-4">
-      <div>
+      <div className="field">
         <Label htmlFor="title">Título</Label>
         <Input id="title" name="title" defaultValue={title} required />
       </div>
-      <div>
+      <div className="field">
         <Label htmlFor="description">Descrição</Label>
         <Textarea id="description" name="description" rows={3} defaultValue={description ?? ""} />
       </div>

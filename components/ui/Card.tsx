@@ -1,6 +1,8 @@
 import { cn } from "@/lib/utils/cn";
 import type { HTMLAttributes } from "react";
 
+// Card Compasso: superfície com borda fina (hairline), sem preenchimento de
+// acento. Elevação é um sussurro (--elev-*). `interactive` adiciona o lift.
 export function Card({
   className,
   interactive,
@@ -9,9 +11,8 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-xl border border-border-subtle bg-surface p-5 shadow-card transition-all duration-200",
-        interactive &&
-          "hover:-translate-y-0.5 hover:border-border-strong hover:shadow-lift",
+        "rounded-[var(--radius-md)] border border-border-subtle bg-surface p-[var(--space-4)] transition-all duration-200",
+        interactive && "mcard hover:border-accent-teal/40",
         className,
       )}
       {...props}

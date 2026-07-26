@@ -4,9 +4,26 @@ import { Moon, Sun } from "lucide-react";
 
 export function ThemeToggle() {
   function toggle() {
-    const next = !document.documentElement.classList.contains("dark");
-    document.documentElement.classList.toggle("dark", next);
-    localStorage.setItem("theme", next ? "dark" : "light");
+    const root = document.documentElement;
+    const apply = () => {
+      const next = !root.classList.contains("dark");
+      root.classList.toggle("dark", next);
+      localStorage.setItem("theme", next ? "dark" : "light");
+    };
+
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // View Transitions dão um crossfade suave da página entre os temas; sem
+    // suporte (ou com movimento reduzido) troca direto, sem animação.
+    const doc = document as Document & {
+      startViewTransition?: (cb: () => void) => { finished?: Promise<void> };
+    };
+    if (!reduce && typeof doc.startViewTransition === "function") {
+      // Cliques em sequência abortam a transição anterior; a promise rejeita
+      // com InvalidStateError — comportamento esperado, então silenciamos.
+      void doc.startViewTransition(apply).finished?.catch(() => {});
+    } else {
+      apply();
+    }
   }
 
   return (
@@ -15,10 +32,10 @@ export function ThemeToggle() {
       onClick={toggle}
       aria-label="Alternar tema claro/escuro"
       title="Alternar tema claro/escuro"
-      className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-900/5 dark:text-zinc-300 dark:hover:bg-white/10"
+      className="ib !size-9 text-text-dim"
     >
-      <Sun size={18} className="dark:hidden" />
-      <Moon size={18} className="hidden dark:block" />
+      <Sun size={17} className="dark:hidden" />
+      <Moon size={17} className="hidden dark:block" />
     </button>
   );
 }

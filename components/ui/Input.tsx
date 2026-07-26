@@ -1,22 +1,20 @@
 import { cn } from "@/lib/utils/cn";
 import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 
-const FIELD_CLASSES =
-  "w-full rounded-lg border border-border-subtle bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-400 transition-colors focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal dark:placeholder:text-zinc-500";
-
+// Campos nativos com a classe .input (hairline + foco petróleo) de globals.css.
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cn(FIELD_CLASSES, className)} {...props} />;
+  return <input className={cn("input", className)} {...props} />;
 }
 
 export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select className={cn(FIELD_CLASSES, className)} {...props} />;
+  return <select className={cn("input", className)} {...props} />;
 }
 
 export function Textarea({
   className,
   ...props
 }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={cn(FIELD_CLASSES, className)} {...props} />;
+  return <textarea className={cn("input", className)} {...props} />;
 }
 
 export function Label({
@@ -26,7 +24,7 @@ export function Label({
   return (
     <label
       className={cn(
-        "mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300",
+        "mb-1.5 block text-xs text-[color-mix(in_srgb,var(--color-text)_70%,transparent)]",
         className,
       )}
       {...props}

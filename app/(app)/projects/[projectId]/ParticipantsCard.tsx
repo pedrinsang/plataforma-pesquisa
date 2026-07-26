@@ -19,17 +19,46 @@ export async function ParticipantsCard({ projectId }: { projectId: string }) {
   const me = members?.find((m) => m.user_id === user?.id);
   const isOwner = me?.role === "owner";
   const canManage = me?.role === "owner" || me?.role === "editor";
+  const visible = (members ?? []).slice(0, 4);
 
   return (
-    <Card className="space-y-4">
+    <Card className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="font-mono text-[0.7rem] uppercase tracking-[0.2em] text-text-dim">
-          Participantes
-        </h2>
-        <span className="font-mono text-[0.7rem] text-text-dim">{members?.length ?? 0}</span>
+        <h2 className="font-serif text-lg font-semibold text-foreground">Participantes</h2>
+        <div className="flex items-center">
+          {visible.map((m, i) => {
+            const label = m.profiles?.full_name || m.profiles?.email || m.invited_email || "—";
+            return (
+              <span
+                key={m.id}
+                className="flex size-7 items-center justify-center rounded-full border-2 border-surface font-serif text-[11px] font-semibold"
+                style={{
+                  background: "var(--color-accent-200)",
+                  color: "var(--color-accent-800)",
+                  marginLeft: i === 0 ? 0 : -8,
+                }}
+                title={label}
+              >
+                {label.trim().charAt(0).toUpperCase() || "?"}
+              </span>
+            );
+          })}
+          {(members?.length ?? 0) > 4 && (
+            <span
+              className="flex size-7 items-center justify-center rounded-full border-2 border-surface text-[10px] font-semibold"
+              style={{
+                background: "var(--color-neutral-300)",
+                color: "var(--color-neutral-800)",
+                marginLeft: -8,
+              }}
+            >
+              +{(members?.length ?? 0) - 4}
+            </span>
+          )}
+        </div>
       </div>
 
-      <div className="divide-y divide-border-subtle">
+      <div>
         {members?.map((member) => {
           const displayName =
             member.profiles?.full_name || member.profiles?.email || member.invited_email || "—";

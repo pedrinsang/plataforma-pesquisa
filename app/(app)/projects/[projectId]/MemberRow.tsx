@@ -33,19 +33,24 @@ export function MemberRow({
   const [isPending, startTransition] = useTransition();
 
   const showRoleSelect = canManage && (role !== "owner" || canManageOwner);
+  const initial = name.trim().charAt(0).toUpperCase() || "?";
 
   return (
-    <div className="flex items-center justify-between gap-3 py-2">
-      <div className="min-w-0">
-        <p className="truncate text-sm text-foreground">{name}</p>
-        {pending && (
-          <span className="text-xs text-zinc-400 dark:text-zinc-500">Convite pendente</span>
-        )}
+    <div className="flex items-center gap-3 border-b border-border-subtle py-2.5 last:border-b-0">
+      <span
+        className="flex size-8 shrink-0 items-center justify-center rounded-full font-serif text-[12px] font-semibold"
+        style={{ background: "var(--color-accent-200)", color: "var(--color-accent-800)" }}
+      >
+        {initial}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13.5px] font-semibold text-foreground">{name}</p>
+        {pending && <span className="text-[11px] text-text-dim">Convite pendente</span>}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {showRoleSelect ? (
           <Select
-            className="w-auto py-1 text-xs"
+            className="!min-h-0 w-auto !py-1 text-xs"
             value={role}
             disabled={isPending}
             onChange={(e) => {
@@ -58,15 +63,18 @@ export function MemberRow({
             {canManageOwner && <option value="owner">Dono</option>}
           </Select>
         ) : (
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">{ROLE_LABELS[role]}</span>
+          <span className={role === "owner" ? "tag tag-accent" : "tag tag-neutral"}>
+            {ROLE_LABELS[role]}
+          </span>
         )}
 
-        {canManage && (role !== "owner" || canManageOwner) && (
-          confirmingRemove ? (
+        {canManage &&
+          (role !== "owner" || canManageOwner) &&
+          (confirmingRemove ? (
             <div className="flex items-center gap-1">
               <Button
                 variant="danger"
-                className="px-2 py-1 text-xs"
+                className="!px-2 !py-1 text-xs"
                 disabled={isPending}
                 onClick={() => startTransition(() => removeMember(memberId, projectId))}
               >
@@ -74,7 +82,7 @@ export function MemberRow({
               </Button>
               <Button
                 variant="ghost"
-                className="px-2 py-1 text-xs"
+                className="!px-2 !py-1 text-xs"
                 onClick={() => setConfirmingRemove(false)}
               >
                 Cancelar
@@ -83,13 +91,12 @@ export function MemberRow({
           ) : (
             <Button
               variant="ghost"
-              className="px-2 py-1 text-xs text-red-600 dark:text-red-400"
+              className="!px-2 !py-1 text-xs !text-[var(--color-neg)]"
               onClick={() => setConfirmingRemove(true)}
             >
               Remover
             </Button>
-          )
-        )}
+          ))}
       </div>
     </div>
   );

@@ -25,9 +25,9 @@ export async function PendingInvites() {
   if (!invites || invites.length === 0) return null;
 
   return (
-    <Card className="space-y-3 border-teal-200 dark:border-teal-900">
-      <h2 className="flex items-center gap-2 font-medium text-foreground">
-        <Mail size={16} /> Convites pendentes
+    <Card className="space-y-3 !border-accent-teal/40 bg-accent-teal-soft/30">
+      <h2 className="flex items-center gap-2 font-serif text-lg font-semibold text-foreground">
+        <Mail size={16} className="text-accent-teal" /> Convites pendentes
       </h2>
       <div className="divide-y divide-border-subtle">
         {invites.map((invite) => (

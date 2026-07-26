@@ -1,30 +1,36 @@
 import type { Metadata } from "next";
-import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Cormorant_Garamond, Lora, Caveat } from "next/font/google";
 import "./globals.css";
 
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin"],
-  style: ["normal", "italic"],
-  weight: "variable",
-  axes: ["opsz", "SOFT", "WONK"],
-});
-
-const plexSans = IBM_Plex_Sans({
-  variable: "--font-plex-sans",
+// Cormorant Garamond — títulos (serifada de display, corte 400–600).
+const cormorant = Cormorant_Garamond({
+  variable: "--font-cormorant",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
-const plexMono = IBM_Plex_Mono({
-  variable: "--font-plex-mono",
+// Lora — corpo (serifada transicional, x-height alto).
+const lora = Lora({
+  variable: "--font-lora",
   subsets: ["latin"],
   weight: ["400", "500", "600"],
+  style: ["normal", "italic"],
+  display: "swap",
+});
+
+// Caveat — caligrafia (notas de margem na landing).
+const caveat = Caveat({
+  variable: "--font-caveat",
+  subsets: ["latin"],
+  weight: ["500", "600"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Plataforma de Pesquisa",
-  description: "Ferramenta de apoio a pesquisadores: escrita e estatística em um só lugar.",
+  title: "Compasso — plataforma de pesquisa científica",
+  description:
+    "Compasso reúne escrita, referências e estatística do seu projeto científico em uma plataforma só — segura, colaborativa e com cuidado editorial.",
 };
 
 export default function RootLayout({
@@ -36,7 +42,7 @@ export default function RootLayout({
     <html
       lang="pt-BR"
       suppressHydrationWarning
-      className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable} h-full antialiased`}
+      className={`${cormorant.variable} ${lora.variable} ${caveat.variable} h-full antialiased`}
     >
       <head>
         <script

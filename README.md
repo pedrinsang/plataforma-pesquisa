@@ -1,6 +1,8 @@
-# Plataforma de Pesquisa
+# Compasso
 
-Site de apoio a pesquisadores, dividido em duas áreas por projeto de pesquisa:
+**Compasso** — plataforma de gestão de projetos de pesquisa científica. Reúne escrita,
+referências e estatística de cada projeto em um só lugar, com cuidado editorial. Dividida em duas
+áreas por projeto de pesquisa:
 
 - **Escrita**: documentos, notas/ideias, referências bibliográficas (ABNT, APA, Vancouver, MDT).
 - **Estatística**: plano de pesquisa, coleta de dados, cálculos estatísticos, gráficos.

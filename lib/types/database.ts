@@ -3,9 +3,15 @@
 //   npx supabase gen types typescript --local > lib/types/database.ts
 // (mantendo esse arquivo em sincronia com as migrations a cada fase nova).
 
+export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+
 export type ProjectMemberRole = "owner" | "editor" | "viewer";
 export type ProjectMemberStatus = "accepted" | "pending";
 export type DatasetColumnType = "text" | "number" | "integer" | "date" | "boolean" | "categorical";
+export type MilestoneStatus = "pending" | "in_progress" | "done";
+export type CaseStatus = "active" | "completed" | "archived";
+export type FieldEntity = "case" | "sample";
+export type FieldType = "text" | "textarea" | "number" | "date" | "select" | "boolean";
 
 export interface Database {
   public: {
@@ -34,6 +40,9 @@ export interface Database {
           owner_id: string;
           title: string;
           description: string | null;
+          project_type: string | null;
+          protocol_code: string | null;
+          sample_target: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -42,10 +51,16 @@ export interface Database {
           owner_id: string;
           title: string;
           description?: string | null;
+          project_type?: string | null;
+          protocol_code?: string | null;
+          sample_target?: number | null;
         };
         Update: {
           title?: string;
           description?: string | null;
+          project_type?: string | null;
+          protocol_code?: string | null;
+          sample_target?: number | null;
         };
         Relationships: [
           {
@@ -65,6 +80,7 @@ export interface Database {
           invited_email: string | null;
           role: ProjectMemberRole;
           status: ProjectMemberStatus;
+          member_title: string | null;
           invited_at: string;
           accepted_at: string | null;
           created_at: string;
@@ -76,10 +92,12 @@ export interface Database {
           invited_email?: string | null;
           role?: ProjectMemberRole;
           status?: ProjectMemberStatus;
+          member_title?: string | null;
         };
         Update: {
           role?: ProjectMemberRole;
           status?: ProjectMemberStatus;
+          member_title?: string | null;
         };
         Relationships: [
           {
@@ -106,7 +124,7 @@ export interface Database {
           content_json: unknown;
           template_type: string | null;
           word_goal: number | null;
-          created_by: string;
+          created_by: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -141,7 +159,7 @@ export interface Database {
           project_id: string;
           name: string;
           description: string | null;
-          created_by: string;
+          created_by: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -248,6 +266,204 @@ export interface Database {
         Relationships: [
           {
             foreignKeyName: "audit_log_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      project_milestones: {
+        Row: {
+          id: string;
+          project_id: string;
+          title: string;
+          detail: string | null;
+          status: MilestoneStatus;
+          position: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          title: string;
+          detail?: string | null;
+          status?: MilestoneStatus;
+          position?: number;
+        };
+        Update: {
+          title?: string;
+          detail?: string | null;
+          status?: MilestoneStatus;
+          position?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "project_milestones_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      project_samples: {
+        Row: {
+          id: string;
+          project_id: string;
+          case_id: string | null;
+          label: string | null;
+          collected_at: string;
+          notes: string | null;
+          custom: Json;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          case_id?: string | null;
+          label?: string | null;
+          collected_at?: string;
+          notes?: string | null;
+          custom?: Json;
+          created_by?: string | null;
+        };
+        Update: {
+          case_id?: string | null;
+          label?: string | null;
+          collected_at?: string;
+          notes?: string | null;
+          custom?: Json;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "project_samples_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "project_samples_case_id_fkey";
+            columns: ["case_id"];
+            isOneToOne: false;
+            referencedRelation: "project_cases";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      project_cases: {
+        Row: {
+          id: string;
+          project_id: string;
+          code: string;
+          description: string | null;
+          status: CaseStatus;
+          custom: Json;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          code: string;
+          description?: string | null;
+          status?: CaseStatus;
+          custom?: Json;
+          created_by?: string | null;
+        };
+        Update: {
+          code?: string;
+          description?: string | null;
+          status?: CaseStatus;
+          custom?: Json;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "project_cases_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      project_field_defs: {
+        Row: {
+          id: string;
+          project_id: string;
+          entity: FieldEntity;
+          field_key: string;
+          label: string;
+          field_type: FieldType;
+          options: Json;
+          required: boolean;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          entity: FieldEntity;
+          field_key: string;
+          label: string;
+          field_type?: FieldType;
+          options?: Json;
+          required?: boolean;
+          position?: number;
+        };
+        Update: {
+          label?: string;
+          field_type?: FieldType;
+          options?: Json;
+          required?: boolean;
+          position?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "project_field_defs_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      project_references: {
+        Row: {
+          id: string;
+          project_id: string;
+          title: string;
+          authors: string | null;
+          year: number | null;
+          doi: string | null;
+          is_essential: boolean;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          title: string;
+          authors?: string | null;
+          year?: number | null;
+          doi?: string | null;
+          is_essential?: boolean;
+          created_by?: string | null;
+        };
+        Update: {
+          title?: string;
+          authors?: string | null;
+          year?: number | null;
+          doi?: string | null;
+          is_essential?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "project_references_project_id_fkey";
             columns: ["project_id"];
             isOneToOne: false;
             referencedRelation: "projects";

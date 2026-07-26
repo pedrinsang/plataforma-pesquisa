@@ -3,11 +3,8 @@ export function FormMessage({ error, success }: { error?: string; success?: stri
 
   return (
     <p
-      className={
-        error
-          ? "text-sm text-red-600 dark:text-red-400"
-          : "text-sm text-green-600 dark:text-green-400"
-      }
+      className="text-sm"
+      style={{ color: error ? "var(--color-neg)" : "var(--color-pos)" }}
     >
       {error ?? success}
     </p>

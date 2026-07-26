@@ -9,11 +9,11 @@ export default function SignupPage() {
       <div className="w-full max-w-sm">
         <Link href="/" className="mb-8 flex items-center justify-center gap-2.5">
           <AppMark size={30} />
-          <span className="font-mono text-[0.7rem] font-medium uppercase tracking-[0.22em] text-foreground">
-            Plataforma <span className="text-text-dim">/ Pesquisa</span>
+          <span className="font-serif text-xl font-semibold tracking-tight text-foreground">
+            Compasso
           </span>
         </Link>
-        <p className="text-center font-mono text-[0.7rem] uppercase tracking-[0.2em] text-text-dim">
+        <p className="text-center text-[0.72rem] uppercase tracking-[0.16em] text-accent-teal">
           Comece de graça
         </p>
         <h1 className="mb-6 mt-2 text-center font-serif text-3xl font-semibold text-foreground">

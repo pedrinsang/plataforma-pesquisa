@@ -24,12 +24,12 @@ export default async function DatasetsPage({
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {datasets.map((ds) => (
             <Link key={ds.id} href={`/projects/${projectId}/statistics/datasets/${ds.id}`} className="group">
-              <div className="panel-ink relative flex h-full flex-col overflow-hidden rounded-xl border border-transparent p-5 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lift">
+              <div className="panel-ink relative flex h-full flex-col overflow-hidden rounded-xl border border-[color:var(--ink-border)] p-5 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lift">
                 <div className="grid-teal pointer-events-none absolute inset-0 opacity-50" aria-hidden />
                 <Database size={18} className="relative text-accent-teal" />
-                <h3 className="relative mt-3 font-serif text-base font-semibold text-white">{ds.name}</h3>
+                <h3 className="relative mt-3 font-serif text-base font-semibold text-[color:var(--ink-text)]">{ds.name}</h3>
                 {ds.description && (
-                  <p className="relative mt-1 line-clamp-2 text-sm text-[#8592a8]">{ds.description}</p>
+                  <p className="relative mt-1 line-clamp-2 text-sm text-[color:var(--ink-dim)]">{ds.description}</p>
                 )}
               </div>
             </Link>
