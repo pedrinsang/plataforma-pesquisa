@@ -69,7 +69,7 @@ export function LandingPage() {
           <AppMark size={26} />
           <span className="font-serif text-[21px] font-semibold tracking-tight">Compasso</span>
         </Link>
-        <div className="ml-6 hidden gap-6 text-sm sm:flex">
+        <div className="ml-6 hidden gap-6 text-sm md:flex">
           <a href="#manuscrito" className="lnk text-text-dim transition-colors hover:text-accent-teal">O manuscrito</a>
           <a href="#recursos" className="lnk text-text-dim transition-colors hover:text-accent-teal">Recursos</a>
           <a href="#seguranca" className="lnk text-text-dim transition-colors hover:text-accent-teal">Segurança</a>
@@ -79,9 +79,11 @@ export function LandingPage() {
           <Link href="/login" className="text-sm text-text-dim transition-colors hover:text-accent-teal">
             Entrar
           </Link>
-          <Link href="/signup" className="btn btn-primary">
-            <Plus size={15} /> Criar projeto gratuito
-          </Link>
+          <span className="hidden md:contents">
+            <Link href="/signup" className="btn btn-primary">
+              <Plus size={15} /> Criar projeto gratuito
+            </Link>
+          </span>
         </div>
       </nav>
 
@@ -139,7 +141,7 @@ export function LandingPage() {
               Hipótese, método, dados e referências — reunidos e versionados desde a primeira
               anotação até a submissão.
             </p>
-            <div className="mt-4 flex items-center gap-2 border-t border-border-subtle pt-3.5">
+            <div className="mt-4 flex flex-wrap items-center gap-2 gap-y-2 border-t border-border-subtle pt-3.5">
               <span className="tag tag-outline !text-[10.5px]">Protocolo 042/2025</span>
               <span className="tag tag-neutral !text-[10.5px]">Projeto de pesquisa</span>
               <span className="ml-auto inline-flex items-center gap-1.5 text-[11px]" style={{ color: "var(--color-accent-700)" }}>
