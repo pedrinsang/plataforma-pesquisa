@@ -1,6 +1,6 @@
-# Compasso
+# Folium
 
-**Compasso** — plataforma de gestão de projetos de pesquisa científica. Reúne escrita,
+**Folium** — plataforma de gestão de projetos de pesquisa científica. Reúne escrita,
 referências e estatística de cada projeto em um só lugar, com cuidado editorial. Dividida em duas
 áreas por projeto de pesquisa:
 

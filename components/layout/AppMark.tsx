@@ -1,8 +1,10 @@
 import { cn } from "@/lib/utils/cn";
 
 /**
- * Marca Compasso: a agulha de uma bússola inscrita num círculo — o "V" que
+ * Marca Folium: a agulha de uma bússola inscrita num círculo — o "V" que
  * aponta o rumo. Traço fino em petróleo, no espírito editorial do sistema.
+ * (O glifo em si — agulha de bússola — é herança do nome anterior; revisar
+ * se quiser um símbolo alinhado a "Folium".)
  */
 export function AppMark({ className, size = 26 }: { className?: string; size?: number }) {
   return (

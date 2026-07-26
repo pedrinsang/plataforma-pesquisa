@@ -3,7 +3,7 @@ import type { ButtonHTMLAttributes } from "react";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
-// Botões seguem a linguagem Compasso: contorno (não preenchimento), acento
+// Botões seguem a linguagem Folium: contorno (não preenchimento), acento
 // petróleo como traço. As classes .btn-* vivem em globals.css.
 const VARIANT_CLASSES: Record<Variant, string> = {
   primary: "btn-primary",

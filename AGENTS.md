@@ -6,11 +6,12 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Contexto do projeto
 
-**Compasso** — plataforma de gestão de projetos de pesquisa científica (uso
+**Folium** — plataforma de gestão de projetos de pesquisa científica (uso
 individual e em equipe). Gratuita nesta fase — sem cobrança, mas com conceito de
 papéis/membros já pronto para monetizar depois. Prioridades do produto:
 **segurança**, **praticidade** e **design** (o visual é tão importante quanto a
-função). O nome oficial da marca é **Compasso** (bússola que aponta o rumo).
+função). O nome oficial da marca é **Folium** (latim para "folha/página" — a
+folha do caderno de pesquisa, no espírito editorial do produto).
 
 ## Stack e arquitetura
 
@@ -27,7 +28,7 @@ função). O nome oficial da marca é **Compasso** (bússola que aponta o rumo).
 - Migrations em `supabase/migrations/`; aplicadas no Supabase remoto com
   `npx supabase db push` (ver `SETUP.md`).
 
-## Design (identidade visual) — sistema "Compasso"
+## Design (identidade visual) — sistema "Folium"
 
 Linguagem **editorial, tipo livro**, derivada do design system "Classical"
 (Claude Design). Referência oficial — toda tela nova segue este padrão.
@@ -58,7 +59,7 @@ Linguagem **editorial, tipo livro**, derivada do design system "Classical"
   **sidebar** (`components/layout/Sidebar`) + **topbar** (`Topbar`); páginas de
   projeto usam `ProjectTabs`. Ícones: **Lucide**.
 - **Marca**: `AppMark` = agulha de bússola inscrita num círculo; wordmark
-  "Compasso" em Cormorant.
+  "Folium" em Cormorant.
 - Animações (reveals de scroll na landing) respeitam `prefers-reduced-motion`
   com estado estático equivalente. Ao mexer em UI, conferir claro **e** escuro.
 
@@ -67,7 +68,7 @@ Linguagem **editorial, tipo livro**, derivada do design system "Classical"
 Feito: auth, CRUD de projetos, editor TipTap (templates/autosave/contador),
 planilha de dados (react-data-grid), dark/light, **segurança reforçada**
 (RLS por papel, rate limit de login, `audit_log`), **convites de participantes
-com aceite do convidado**, **redesign visual completo — sistema "Compasso"**
+com aceite do convidado**, **redesign visual completo — sistema "Folium"**
 (editorial/petróleo, Cormorant + Lora, claro/escuro), **timeline/marcos**
 (linha do tempo com CRUD e reordenação) e **amostras/coleta** (CRUD em
 `statistics/samples`, alimenta o card e o gráfico semanal da visão geral).

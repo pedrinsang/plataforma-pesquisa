@@ -20,7 +20,7 @@ export default async function LoginPage({
         <Link href="/" className="mb-8 flex items-center justify-center gap-2.5">
           <AppMark size={30} />
           <span className="font-serif text-xl font-semibold tracking-tight text-foreground">
-            Compasso
+            Folium
           </span>
         </Link>
         <p className="text-center text-[0.72rem] uppercase tracking-[0.16em] text-accent-teal">

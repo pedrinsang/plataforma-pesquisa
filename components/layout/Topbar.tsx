@@ -14,7 +14,7 @@ export function Topbar({ email }: { email: string }) {
       {/* marca — só no mobile (no desktop ela vive na sidebar) */}
       <Link href="/projects" className="flex items-center gap-2 md:hidden">
         <AppMark size={24} />
-        <span className="font-serif text-lg font-semibold text-foreground">Compasso</span>
+        <span className="font-serif text-lg font-semibold text-foreground">Folium</span>
       </Link>
 
       {/* busca */}

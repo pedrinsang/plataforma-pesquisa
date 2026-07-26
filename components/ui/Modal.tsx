@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { X } from "lucide-react";
 
-// Modal simples no estilo Compasso: superfície de papel, régua fina, fecha no
+// Modal simples no estilo Folium: superfície de papel, régua fina, fecha no
 // Escape e no clique fora. Cabeçalho fixo para formulários longos rolarem.
 export function Modal({
   open,

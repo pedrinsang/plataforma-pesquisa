@@ -20,7 +20,7 @@ export function Sidebar({ projects, email }: { projects: Project[]; email: strin
       <Link href="/projects" className="flex items-center gap-2.5 px-5 pb-5 pt-5">
         <AppMark />
         <span className="font-serif text-xl font-semibold tracking-tight text-foreground">
-          Compasso
+          Folium
         </span>
       </Link>
 

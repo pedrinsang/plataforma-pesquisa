@@ -28,9 +28,9 @@ const caveat = Caveat({
 });
 
 export const metadata: Metadata = {
-  title: "Compasso — plataforma de pesquisa científica",
+  title: "Folium — plataforma de pesquisa científica",
   description:
-    "Compasso reúne escrita, referências e estatística do seu projeto científico em uma plataforma só — segura, colaborativa e com cuidado editorial.",
+    "Folium reúne escrita, referências e estatística do seu projeto científico em uma plataforma só — segura, colaborativa e com cuidado editorial.",
 };
 
 export default function RootLayout({

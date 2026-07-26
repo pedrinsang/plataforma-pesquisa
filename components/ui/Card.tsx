@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils/cn";
 import type { HTMLAttributes } from "react";
 
-// Card Compasso: superfície com borda fina (hairline), sem preenchimento de
+// Card Folium: superfície com borda fina (hairline), sem preenchimento de
 // acento. Elevação é um sussurro (--elev-*). `interactive` adiciona o lift.
 export function Card({
   className,

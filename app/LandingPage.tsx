@@ -67,7 +67,7 @@ export function LandingPage() {
         style={{ background: "color-mix(in srgb, var(--color-bg) 86%, transparent)" }}>
         <Link href="#top" className="flex items-center gap-2.5 text-foreground">
           <AppMark size={26} />
-          <span className="font-serif text-[21px] font-semibold tracking-tight">Compasso</span>
+          <span className="font-serif text-[21px] font-semibold tracking-tight">Folium</span>
         </Link>
         <div className="ml-6 hidden gap-6 text-sm md:flex">
           <a href="#manuscrito" className="lnk text-text-dim transition-colors hover:text-accent-teal">O manuscrito</a>
@@ -364,14 +364,14 @@ export function LandingPage() {
                 <span className="size-2.5 rounded-full" style={{ background: "var(--color-neutral-300)" }} />
                 <span className="size-2.5 rounded-full" style={{ background: "var(--color-neutral-300)" }} />
                 <div className="ml-3 flex max-w-[320px] flex-1 items-center gap-1.5 rounded-md border border-border-subtle px-3 py-1 text-[11.5px]" style={{ background: "var(--color-bg)", color: dim(55) }}>
-                  compasso.app/meus-projetos
+                  folium.app/meus-projetos
                 </div>
               </div>
               <div className="flex min-h-[340px]">
                 <aside className="hidden w-[172px] shrink-0 flex-col gap-1 border-r border-border-subtle p-3 sm:flex" style={{ background: "var(--color-surface)" }}>
                   <div className="flex items-center gap-2 px-1.5 pb-4 pt-0.5">
                     <AppMark size={20} />
-                    <span className="font-serif text-[16px] font-semibold">Compasso</span>
+                    <span className="font-serif text-[16px] font-semibold">Folium</span>
                   </div>
                   <span className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[12.5px]" style={{ background: "var(--color-accent-100)", color: "var(--color-accent-800)" }}>
                     <FileText size={14} /> Meus Projetos
@@ -497,7 +497,7 @@ export function LandingPage() {
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-5 px-[clamp(20px,5vw,64px)] py-9">
           <Link href="#top" className="flex items-center gap-2 text-foreground">
             <AppMark size={22} />
-            <span className="font-serif text-[18px] font-semibold">Compasso</span>
+            <span className="font-serif text-[18px] font-semibold">Folium</span>
           </Link>
           <div className="ml-3 flex gap-5 text-[13px]">
             <a href="#recursos" className="transition-colors hover:text-accent-teal" style={{ color: dim(60) }}>Recursos</a>
@@ -505,7 +505,7 @@ export function LandingPage() {
             <Link href="/login" className="transition-colors hover:text-accent-teal" style={{ color: dim(60) }}>Entrar</Link>
           </div>
           <div className="ml-auto text-[12px]" style={{ color: dim(55) }}>
-            © 2026 Compasso · Plataforma de gestão científica
+            © 2026 Folium · Plataforma de gestão científica
           </div>
         </div>
       </footer>
