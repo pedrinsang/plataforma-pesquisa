@@ -63,15 +63,26 @@ export function Popover({
   children,
   align = "start",
   panelClassName,
+  openSignal,
 }: {
   trigger: (props: { open: boolean; toggle: () => void; triggerRef: React.RefObject<HTMLButtonElement | null> }) => ReactNode;
   children: (close: () => void) => ReactNode;
   align?: "start" | "end";
   panelClassName?: string;
+  /** Incrementar este número abre o popover de fora (ex.: atalho de teclado). */
+  openSignal?: number;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // Abertura externa via sinal: ajusta o estado durante o render quando o sinal
+  // muda (padrão recomendado do React, sem efeito). 0/undefined = inicial.
+  const [prevSignal, setPrevSignal] = useState(openSignal);
+  if (openSignal !== prevSignal) {
+    setPrevSignal(openSignal);
+    if (openSignal) setOpen(true);
+  }
 
   useEffect(() => {
     if (!open) return;

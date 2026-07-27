@@ -38,7 +38,7 @@ import { FontSizeControl } from "./toolbar/FontSizeControl";
 import { LinkControl } from "./toolbar/LinkControl";
 import { ImageControl } from "./toolbar/ImageControl";
 import { TableControl } from "./toolbar/TableControl";
-import { FONT_FAMILIES, LINE_HEIGHTS } from "@/lib/writing/editor-extensions";
+import { FONT_FAMILIES, LINE_HEIGHTS, PARAGRAPH_SPACINGS } from "@/lib/writing/editor-extensions";
 
 const BLOCK_STYLES = [
   { label: "Texto normal", level: 0 as const },
@@ -58,10 +58,13 @@ export function Toolbar({
   editor,
   projectId,
   onInsertStat,
+  linkOpenSignal,
 }: {
   editor: Editor;
   projectId: string;
   onInsertStat: () => void;
+  /** Incrementado pelo Ctrl+K no editor para abrir o popover de link. */
+  linkOpenSignal?: number;
 }) {
   // Estado reativo: re-renderiza a barra a cada mudança de seleção/conteúdo.
   const s = useEditorState({
@@ -264,7 +267,7 @@ export function Toolbar({
 
       {/* Inserir */}
       <ToolbarGroup>
-        <LinkControl editor={editor} active={s.link} />
+        <LinkControl editor={editor} active={s.link} openSignal={linkOpenSignal} />
         <ImageControl editor={editor} projectId={projectId} />
         <TableControl editor={editor} />
         <ToolbarButton label="Inserir gráfico ou estatística" onClick={onInsertStat}>
@@ -312,12 +315,47 @@ export function Toolbar({
                 </MenuItem>
               ))}
               <div className="my-1 h-px bg-border-subtle" />
+              <p className="px-2.5 py-1 text-[0.6rem] uppercase tracking-[0.14em] text-text-dim">
+                Espaço antes do parágrafo
+              </p>
+              <div className="grid grid-cols-4 gap-0.5 px-1.5 pb-1">
+                {PARAGRAPH_SPACINGS.map((sp) => (
+                  <button
+                    key={`before-${sp.value}`}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => chain().setSpaceBefore(sp.value).run()}
+                    title={`Espaço antes: ${sp.label}`}
+                    className="rounded-md px-1 py-1 text-center text-xs text-foreground transition-colors hover:bg-[color:color-mix(in_srgb,var(--color-accent)_10%,transparent)]"
+                  >
+                    {sp.value === 0 ? "0" : sp.value}
+                  </button>
+                ))}
+              </div>
+              <p className="px-2.5 py-1 text-[0.6rem] uppercase tracking-[0.14em] text-text-dim">
+                Espaço depois do parágrafo
+              </p>
+              <div className="grid grid-cols-4 gap-0.5 px-1.5 pb-1">
+                {PARAGRAPH_SPACINGS.map((sp) => (
+                  <button
+                    key={`after-${sp.value}`}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => chain().setSpaceAfter(sp.value).run()}
+                    title={`Espaço depois: ${sp.label}`}
+                    className="rounded-md px-1 py-1 text-center text-xs text-foreground transition-colors hover:bg-[color:color-mix(in_srgb,var(--color-accent)_10%,transparent)]"
+                  >
+                    {sp.value === 0 ? "0" : sp.value}
+                  </button>
+                ))}
+              </div>
+              <div className="my-1 h-px bg-border-subtle" />
               <MenuItem onClick={() => { chain().setPageBreak().run(); close(); }}>
                 <SeparatorHorizontal size={14} /> Quebra de página
               </MenuItem>
               <MenuItem
                 onClick={() => {
-                  chain().unsetAllMarks().clearNodes().unsetLineHeight().run();
+                  chain().unsetAllMarks().clearNodes().unsetLineHeight().unsetParagraphSpacing().run();
                   close();
                 }}
               >

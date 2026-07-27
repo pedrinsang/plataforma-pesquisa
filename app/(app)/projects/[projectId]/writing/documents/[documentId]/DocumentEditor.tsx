@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor } from "@tiptap/react";
 import { Trash2 } from "lucide-react";
 import { Toolbar } from "@/components/writing/Toolbar";
 import { StatPanel } from "@/components/writing/StatPanel";
 import { WordCountBadge } from "@/components/writing/WordCountBadge";
+import { WritingCanvas } from "@/components/writing/WritingCanvas";
+import { WritingStatusBar } from "@/components/writing/WritingStatusBar";
 import { buildEditorExtensions } from "@/lib/writing/editor-extensions";
+import { ZOOM_DEFAULT } from "@/lib/writing/page-metrics";
 import type { StatSourceKind } from "@/lib/writing/stat-sources";
 import { updateDocumentContent, updateDocumentTitle, deleteDocument } from "@/lib/actions/documents";
 import { cn } from "@/lib/utils/cn";
@@ -31,14 +34,19 @@ export function DocumentEditor({
 }) {
   const [title, setTitle] = useState(initialTitle);
   const [wordCount, setWordCount] = useState(0);
+  const [charCount, setCharCount] = useState(0);
+  const [pageCount, setPageCount] = useState(1);
+  const [zoom, setZoom] = useState(ZOOM_DEFAULT);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving">("saved");
   const [panelOpen, setPanelOpen] = useState(false);
+  const [linkOpenSignal, setLinkOpenSignal] = useState(0);
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleEditorUpdate = useCallback(
     (json: object, text: string) => {
       setWordCount(countWords(text));
+      setCharCount(text.length);
       setSaveStatus("saving");
       if (contentTimer.current) clearTimeout(contentTimer.current);
       contentTimer.current = setTimeout(async () => {
@@ -56,14 +64,32 @@ export function DocumentEditor({
     editorProps: {
       attributes: {
         class:
-          "folium-editor prose prose-zinc dark:prose-invert prose-lg prose-headings:font-serif prose-headings:font-semibold prose-p:leading-relaxed max-w-none min-h-[62vh] rounded-2xl border border-border-subtle bg-surface px-8 py-10 shadow-card focus:outline-none sm:px-12",
+          "folium-editor prose prose-zinc prose-lg prose-headings:font-serif prose-headings:font-semibold prose-p:leading-relaxed max-w-none focus:outline-none",
       },
     },
-    onCreate: ({ editor }) => setWordCount(countWords(editor.getText())),
+    onCreate: ({ editor }) => {
+      const text = editor.getText();
+      setWordCount(countWords(text));
+      setCharCount(text.length);
+    },
     onUpdate: ({ editor }) => handleEditorUpdate(editor.getJSON(), editor.getText()),
   });
 
   useEffect(() => () => editor?.destroy(), [editor]);
+
+  // Ctrl/Cmd+K abre o popover de link (padrão de processador de texto).
+  useEffect(() => {
+    if (!editor) return;
+    const dom = editor.view.dom;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setLinkOpenSignal((n) => n + 1);
+      }
+    };
+    dom.addEventListener("keydown", onKeyDown);
+    return () => dom.removeEventListener("keydown", onKeyDown);
+  }, [editor]);
 
   function handleTitleChange(value: string) {
     setTitle(value);
@@ -81,7 +107,7 @@ export function DocumentEditor({
   return (
     <div className="space-y-5">
       {/* Cabeçalho fixo: título + estado + barra de ferramentas */}
-      <div className="sticky top-16 z-20 -mx-1 space-y-2 rounded-xl border border-border-subtle bg-surface/85 px-3 py-2.5 backdrop-blur-md">
+      <div className="sticky top-16 z-20 -mx-1 space-y-2 rounded-xl border border-border-subtle bg-surface/85 px-3 py-2.5 backdrop-blur-md print:hidden">
         <div className="flex flex-wrap items-center gap-3">
           <input
             value={title}
@@ -117,15 +143,29 @@ export function DocumentEditor({
             </button>
           </div>
         </div>
-        {editor && <Toolbar editor={editor} projectId={projectId} onInsertStat={() => setPanelOpen(true)} />}
+        {editor && (
+          <Toolbar
+            editor={editor}
+            projectId={projectId}
+            onInsertStat={() => setPanelOpen(true)}
+            linkOpenSignal={linkOpenSignal}
+          />
+        )}
       </div>
 
-      <div className="mx-auto max-w-3xl">
-        <div className="mb-3 flex justify-end">
-          <WordCountBadge documentId={documentId} wordCount={wordCount} initialGoal={initialWordGoal} />
-        </div>
-        <EditorContent editor={editor} />
+      <div className="mx-auto flex max-w-3xl justify-end print:hidden">
+        <WordCountBadge documentId={documentId} wordCount={wordCount} initialGoal={initialWordGoal} />
       </div>
+
+      <WritingCanvas editor={editor} zoom={zoom} onPageCountChange={setPageCount} />
+
+      <WritingStatusBar
+        pageCount={pageCount}
+        wordCount={wordCount}
+        charCount={charCount}
+        zoom={zoom}
+        onZoomChange={setZoom}
+      />
 
       <StatPanel
         open={panelOpen}

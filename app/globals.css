@@ -425,6 +425,46 @@ textarea.input { min-height: 90px; resize: vertical; }
    @layer, então vencem os estilos do typography na cascata. */
 .folium-editor:focus { outline: none; }
 
+/* ── simulação de folha de papel (estilo Word) ──────────────────────────
+   A folha é SEMPRE clara ("como imprimir"), exceção intencional do design; o
+   `.paper-light` reverte os tokens para os valores claros no escopo da folha,
+   então tabelas/citações/dividers ficam corretos mesmo no tema escuro. */
+.folium-canvas {
+  display: flex;
+  justify-content: center;
+  overflow: auto;
+  max-height: calc(100dvh - 14rem);
+  padding: 2rem 1.5rem 3rem;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-text) 8%, var(--color-bg));
+}
+.folium-zoom-sizer { flex: none; }
+.folium-zoom { position: relative; }
+
+.folium-page {
+  position: relative;
+  box-sizing: border-box;
+  background: #ffffff;
+  color: #1c1b19;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14), 0 14px 38px rgba(0, 0, 0, 0.22);
+}
+.folium-page .folium-editor { color: #1c1b19; min-height: calc(29.7cm - 5cm); }
+
+/* overlay de guias/numeração — sobre a folha, sem capturar cliques */
+.folium-page-guides { position: absolute; inset: 0; pointer-events: none; }
+.folium-page-guide {
+  position: absolute; left: 0; right: 0;
+  border-top: 1px dashed color-mix(in srgb, var(--color-accent-teal) 40%, transparent);
+}
+.folium-page-num {
+  position: absolute; left: 50%; transform: translate(-50%, -50%);
+  padding: 1px 9px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #8c8b86; white-space: nowrap;
+}
+
 /* tabelas */
 .folium-editor .tableWrapper { overflow-x: auto; margin: 1em 0; }
 .folium-editor table {
@@ -482,6 +522,15 @@ textarea.input { min-height: 90px; resize: vertical; }
 @media print {
   .folium-editor .folium-page-break { break-after: page; border: 0; height: 0; }
   .folium-editor .folium-page-break::after { display: none; }
+
+  /* Ao imprimir/exportar PDF, a folha vira a própria página: sem canvas,
+     sem sombra, sem zoom, sem guias na tela. O motor de impressão pagina. */
+  .folium-canvas { max-height: none; overflow: visible; padding: 0; background: #fff; display: block; }
+  .folium-zoom-sizer,
+  .folium-zoom { width: auto !important; height: auto !important; transform: none !important; }
+  .folium-page { box-shadow: none; width: auto !important; min-height: 0 !important; padding: 0 !important; }
+  .folium-page .folium-editor { min-height: 0 !important; }
+  .folium-page-guides { display: none !important; }
 }
 
 /* ─────────────────────  transição de tema (claro↔escuro)  ────────────

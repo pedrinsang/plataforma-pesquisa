@@ -6,9 +6,19 @@ import { Link2, Link2Off } from "lucide-react";
 import { Popover, ToolbarButton } from "./primitives";
 
 /** Insere/edita/remove links via um pequeno popover com campo de URL. */
-export function LinkControl({ editor, active }: { editor: Editor; active: boolean }) {
+export function LinkControl({
+  editor,
+  active,
+  openSignal,
+}: {
+  editor: Editor;
+  active: boolean;
+  /** Incrementado pelo atalho Ctrl+K para abrir o popover. */
+  openSignal?: number;
+}) {
   return (
     <Popover
+      openSignal={openSignal}
       panelClassName="w-72 p-3"
       trigger={({ open, toggle, triggerRef }) => (
         <button

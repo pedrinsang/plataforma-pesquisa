@@ -12,6 +12,7 @@ import TextAlign from "@tiptap/extension-text-align";
 import Image from "@tiptap/extension-image";
 import { TableKit } from "@tiptap/extension-table";
 import { LineHeight } from "@/lib/writing/extensions/line-height";
+import { ParagraphSpacing } from "@/lib/writing/extensions/paragraph-spacing";
 import { Indent } from "@/lib/writing/extensions/indent";
 import { PageBreak } from "@/lib/writing/extensions/page-break";
 import { StatChart } from "@/lib/writing/extensions/stat-chart";
@@ -40,6 +41,17 @@ export const LINE_HEIGHTS: Array<{ label: string; value: string }> = [
   { label: "Duplo", value: "2" },
 ];
 
+// Presets de espaçamento antes/depois de parágrafo, em pontos (pt).
+export const PARAGRAPH_SPACINGS: Array<{ label: string; value: number }> = [
+  { label: "Nenhum", value: 0 },
+  { label: "4 pt", value: 4 },
+  { label: "6 pt", value: 6 },
+  { label: "8 pt", value: 8 },
+  { label: "12 pt", value: 12 },
+  { label: "18 pt", value: 18 },
+  { label: "24 pt", value: 24 },
+];
+
 /**
  * Conjunto de extensões do editor de Escrita. Centralizado aqui para o editor e
  * os testes usarem exatamente a mesma configuração.
@@ -65,6 +77,7 @@ export function buildEditorExtensions() {
     Image.configure({ inline: false, allowBase64: false }),
     TableKit.configure({ table: { resizable: true } }),
     LineHeight,
+    ParagraphSpacing,
     Indent,
     PageBreak,
     StatChart,
