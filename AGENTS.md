@@ -65,7 +65,14 @@ Linguagem **editorial, tipo livro**, derivada do design system "Classical"
 
 ## Estado (atualizado em jul/2026)
 
-Feito: auth, CRUD de projetos, editor TipTap (templates/autosave/contador),
+Feito: auth, CRUD de projetos, **editor de Escrita nível processador de texto**
+(TipTap 3 + StarterKit; fonte/tamanho, cor/destaque, sub/sobrescrito, alinhamento,
+listas, recuo e espaçamento entre linhas, títulos 1–4/citação, link, imagem via
+Storage, tabela, quebra de página; toolbar agrupada sticky + menu "Mais";
+autosave/contador preservados) e **estatística embutida na Escrita** (node
+`statChart` que renderiza uma planilha da aba Estatística ao vivo pelo `statId`,
+inserida por painel lateral estilo Canva — `components/writing/*`,
+`lib/writing/extensions/*`),
 planilha de dados (react-data-grid), dark/light, **segurança reforçada**
 (RLS por papel, rate limit de login, `audit_log`), **convites de participantes
 com aceite do convidado**, **redesign visual completo — sistema "Folium"**
@@ -76,8 +83,10 @@ com aceite do convidado**, **redesign visual completo — sistema "Folium"**
 Falta (do brief): feed de atividade (pode vir do `audit_log`), status do
 projeto, biblioteca de **referências/citações** (inserção via "@" no editor),
 histórico de versões do texto, bloco de ideias/kanban, **gráficos** (nenhuma lib
-instalada), importação CSV/Excel, **campos customizáveis** das amostras,
-**achados**, e embutir estatísticas na escrita.
+instalada — o node `statChart` já prevê `statType: 'chart'` para quando existir),
+importação CSV/Excel, **campos customizáveis** das amostras e **achados**.
 
-Notas: sanitização XSS só vira necessária quando o editor ganhar link/imagem.
+Notas: o editor já tem link e imagem — quando o conteúdo for renderizado fora do
+TipTap (export/print), avaliar sanitização XSS do HTML. Upload de imagem usa o
+bucket `writing-images` (migration `20260727120000`; rodar `npx supabase db push`).
 Convites não enviam e-mail (vinculam por `invited_email` no cadastro).
