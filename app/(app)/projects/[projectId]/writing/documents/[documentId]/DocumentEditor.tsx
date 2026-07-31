@@ -2,46 +2,84 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditor } from "@tiptap/react";
-import { Trash2 } from "lucide-react";
-import { Toolbar } from "@/components/writing/Toolbar";
+import { DocumentTopBar } from "@/components/writing/DocumentTopBar";
+import { RibbonTabs, type RibbonTab } from "@/components/writing/RibbonTabs";
+import { Ribbon } from "@/components/writing/ribbon/Ribbon";
+import { OutlinePanel } from "@/components/writing/OutlinePanel";
+import { SideRail, type RailPanel } from "@/components/writing/SideRail";
 import { StatPanel } from "@/components/writing/StatPanel";
-import { WordCountBadge } from "@/components/writing/WordCountBadge";
 import { WritingCanvas } from "@/components/writing/WritingCanvas";
+import { RulerBand } from "@/components/writing/WritingRuler";
 import { WritingStatusBar } from "@/components/writing/WritingStatusBar";
+import { SearchReplacePanel } from "@/components/writing/SearchReplacePanel";
 import { buildEditorExtensions } from "@/lib/writing/editor-extensions";
 import { ZOOM_DEFAULT } from "@/lib/writing/page-metrics";
 import type { StatSourceKind } from "@/lib/writing/stat-sources";
-import { updateDocumentContent, updateDocumentTitle, deleteDocument } from "@/lib/actions/documents";
-import { cn } from "@/lib/utils/cn";
+import {
+  updateDocumentContent,
+  updateDocumentTitle,
+  updateDocumentHeaderFooter,
+  updateWordGoal,
+  deleteDocument,
+} from "@/lib/actions/documents";
 
 function countWords(text: string) {
   const trimmed = text.trim();
   return trimmed === "" ? 0 : trimmed.split(/\s+/).length;
 }
 
+/**
+ * Editor de Escrita em tela cheia (design "Escrita — Editor em tela cheia"):
+ * três linhas de chrome no topo (documento · abas da faixa · faixa agrupada),
+ * régua, folha centralizada, trilho de painéis à direita e barra de status.
+ * O shell é uma ilha de tinta (`.folium-shell`) — escuro nos dois temas do app,
+ * com a folha branca no centro.
+ */
 export function DocumentEditor({
   documentId,
   projectId,
   initialTitle,
   initialContent,
   initialWordGoal,
+  initialHeader,
+  initialFooter,
+  userEmail,
 }: {
   documentId: string;
   projectId: string;
   initialTitle: string;
   initialContent: object;
   initialWordGoal: number | null;
+  initialHeader: string | null;
+  initialFooter: string | null;
+  userEmail: string;
 }) {
   const [title, setTitle] = useState(initialTitle);
+  const [headerFooter, setHeaderFooter] = useState({
+    header: initialHeader ?? "",
+    footer: initialFooter ?? "",
+  });
+  const [goal, setGoal] = useState(initialWordGoal);
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
   const [pageCount, setPageCount] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving">("saved");
-  const [panelOpen, setPanelOpen] = useState(false);
+  const [tab, setTab] = useState<RibbonTab>("Início");
+  const [ribbonCollapsed, setRibbonCollapsed] = useState(false);
+  const [panel, setPanel] = useState<RailPanel | null>(null);
   const [linkOpenSignal, setLinkOpenSignal] = useState(0);
+  const [search, setSearch] = useState<{ open: boolean; replace: boolean }>({
+    open: false,
+    replace: false,
+  });
+  const [showRuler, setShowRuler] = useState(true);
+  const [viewport, setViewport] = useState({ scrollLeft: 0, gutter: 0 });
+
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const headerFooterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleEditorUpdate = useCallback(
     (json: object, text: string) => {
@@ -77,6 +115,15 @@ export function DocumentEditor({
 
   useEffect(() => () => editor?.destroy(), [editor]);
 
+  // O shell ocupa a viewport inteira: trava a rolagem da página por baixo.
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, []);
+
   // Ctrl/Cmd+K abre o popover de link (padrão de processador de texto).
   useEffect(() => {
     if (!editor) return;
@@ -84,6 +131,7 @@ export function DocumentEditor({
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "k") {
         e.preventDefault();
+        setTab("Inserir");
         setLinkOpenSignal((n) => n + 1);
       }
     };
@@ -91,87 +139,159 @@ export function DocumentEditor({
     return () => dom.removeEventListener("keydown", onKeyDown);
   }, [editor]);
 
+  // Ctrl/Cmd+F (localizar) e Ctrl/Cmd+H (substituir) — nível de página, para
+  // funcionar mesmo com o foco fora da folha.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const key = e.key.toLowerCase();
+      if (key === "f") {
+        e.preventDefault();
+        setSearch({ open: true, replace: false });
+      } else if (key === "h") {
+        e.preventDefault();
+        setSearch({ open: true, replace: true });
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   function handleTitleChange(value: string) {
     setTitle(value);
+    setSaveStatus("saving");
     if (titleTimer.current) clearTimeout(titleTimer.current);
-    titleTimer.current = setTimeout(() => {
-      updateDocumentTitle(documentId, projectId, value);
+    titleTimer.current = setTimeout(async () => {
+      await updateDocumentTitle(documentId, projectId, value);
+      setSaveStatus("saved");
     }, 800);
+  }
+
+  function handleHeaderFooterChange(next: { header: string; footer: string }) {
+    setHeaderFooter(next);
+    setSaveStatus("saving");
+    if (headerFooterTimer.current) clearTimeout(headerFooterTimer.current);
+    headerFooterTimer.current = setTimeout(async () => {
+      await updateDocumentHeaderFooter(documentId, next.header, next.footer);
+      setSaveStatus("saved");
+    }, 800);
+  }
+
+  function handleGoalChange(next: number | null) {
+    setGoal(next);
+    void updateWordGoal(documentId, next);
   }
 
   function handleInsertStat(statId: string, kind: StatSourceKind) {
     editor?.chain().focus().insertStatChart({ statId, statType: kind }).run();
-    setPanelOpen(false);
+    setPanel(null);
   }
 
   return (
-    <div className="space-y-5">
-      {/* Cabeçalho fixo: título + estado + barra de ferramentas */}
-      <div className="sticky top-16 z-20 -mx-1 space-y-2 rounded-xl border border-border-subtle bg-surface/85 px-3 py-2.5 backdrop-blur-md print:hidden">
-        <div className="flex flex-wrap items-center gap-3">
-          <input
-            value={title}
-            onChange={(e) => handleTitleChange(e.target.value)}
-            placeholder="Documento sem título"
-            className="min-w-0 flex-1 bg-transparent font-serif text-lg font-semibold text-foreground placeholder:text-text-dim/60 focus:outline-none"
-          />
-          <div className="flex items-center gap-3">
-            <span
-              className={cn(
-                "flex items-center gap-1.5 font-mono text-[0.7rem] uppercase tracking-wide",
-                saveStatus === "saving" ? "text-accent-gold" : "text-text-dim",
-              )}
-            >
-              <span
-                className={cn(
-                  "size-1.5 rounded-full",
-                  saveStatus === "saving" ? "animate-pulse bg-accent-gold" : "bg-accent-teal",
-                )}
-              />
-              {saveStatus === "saving" ? "Salvando" : "Salvo"}
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                if (confirm("Excluir este documento?")) deleteDocument(documentId, projectId);
-              }}
-              aria-label="Excluir documento"
-              title="Excluir documento"
-              className="rounded-lg p-1.5 text-text-dim transition-colors hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        </div>
-        {editor && (
-          <Toolbar
+    <div className="folium-shell fixed inset-0 z-50 flex flex-col">
+      <DocumentTopBar
+        projectId={projectId}
+        title={title}
+        onTitleChange={handleTitleChange}
+        saveStatus={saveStatus}
+        showRuler={showRuler}
+        onToggleRuler={() => setShowRuler((v) => !v)}
+        header={headerFooter.header}
+        footer={headerFooter.footer}
+        onHeaderFooterChange={handleHeaderFooterChange}
+        userInitial={(userEmail.trim()[0] ?? "?").toUpperCase()}
+        userEmail={userEmail}
+      />
+
+      <RibbonTabs
+        active={tab}
+        onSelect={(next) => {
+          setTab(next);
+          setRibbonCollapsed(false);
+        }}
+        collapsed={ribbonCollapsed}
+        onToggleCollapsed={() => setRibbonCollapsed((v) => !v)}
+      />
+
+      {editor && !ribbonCollapsed && (
+        <Ribbon
+          editor={editor}
+          tab={tab}
+          projectId={projectId}
+          linkOpenSignal={linkOpenSignal}
+          onInsertStat={() => setPanel("stats")}
+          onFind={() => setSearch({ open: true, replace: false })}
+          onReplace={() => setSearch({ open: true, replace: true })}
+          showRuler={showRuler}
+          onToggleRuler={() => setShowRuler((v) => !v)}
+          header={headerFooter.header}
+          footer={headerFooter.footer}
+          onHeaderFooterChange={handleHeaderFooterChange}
+          onDelete={() => {
+            if (confirm("Excluir este documento?")) deleteDocument(documentId, projectId);
+          }}
+          wordCount={wordCount}
+          charCount={charCount}
+          goal={goal}
+          onGoalChange={handleGoalChange}
+        />
+      )}
+
+      <div className="relative flex min-h-0 flex-1">
+        <div className="flex min-w-0 flex-1 flex-col">
+          {showRuler && editor && (
+            <RulerBand
+              editor={editor}
+              zoom={zoom}
+              scrollLeft={viewport.scrollLeft}
+              gutter={viewport.gutter}
+            />
+          )}
+          <WritingCanvas
             editor={editor}
+            zoom={zoom}
+            header={headerFooter.header}
+            footer={headerFooter.footer}
+            onPageCountChange={setPageCount}
+            onCurrentPageChange={setCurrentPage}
+            onViewport={setViewport}
+          />
+        </div>
+
+        {panel === "stats" && (
+          <StatPanel
             projectId={projectId}
-            onInsertStat={() => setPanelOpen(true)}
-            linkOpenSignal={linkOpenSignal}
+            onClose={() => setPanel(null)}
+            onInsert={handleInsertStat}
+          />
+        )}
+        {panel === "outline" && editor && (
+          <OutlinePanel editor={editor} onClose={() => setPanel(null)} />
+        )}
+
+        <SideRail
+          open={panel}
+          onToggle={(next) => setPanel((prev) => (prev === next ? null : next))}
+        />
+
+        {editor && (
+          <SearchReplacePanel
+            editor={editor}
+            open={search.open}
+            showReplace={search.replace}
+            onClose={() => setSearch({ open: false, replace: false })}
           />
         )}
       </div>
 
-      <div className="mx-auto flex max-w-3xl justify-end print:hidden">
-        <WordCountBadge documentId={documentId} wordCount={wordCount} initialGoal={initialWordGoal} />
-      </div>
-
-      <WritingCanvas editor={editor} zoom={zoom} onPageCountChange={setPageCount} />
-
       <WritingStatusBar
+        currentPage={currentPage}
         pageCount={pageCount}
         wordCount={wordCount}
         charCount={charCount}
+        goal={goal}
         zoom={zoom}
         onZoomChange={setZoom}
-      />
-
-      <StatPanel
-        open={panelOpen}
-        projectId={projectId}
-        onClose={() => setPanelOpen(false)}
-        onInsert={handleInsertStat}
       />
     </div>
   );

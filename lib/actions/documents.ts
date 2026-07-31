@@ -60,6 +60,21 @@ export async function updateWordGoal(documentId: string, wordGoal: number | null
   await supabase.from("documents").update({ word_goal: wordGoal }).eq("id", documentId);
 }
 
+export async function updateDocumentHeaderFooter(
+  documentId: string,
+  header: string | null,
+  footer: string | null,
+) {
+  const supabase = await createClient();
+  await supabase
+    .from("documents")
+    .update({
+      header_text: header && header.trim() !== "" ? header : null,
+      footer_text: footer && footer.trim() !== "" ? footer : null,
+    })
+    .eq("id", documentId);
+}
+
 export async function deleteDocument(documentId: string, projectId: string) {
   const supabase = await createClient();
   await supabase.from("documents").delete().eq("id", documentId);

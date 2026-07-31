@@ -1,72 +1,103 @@
 "use client";
 
-import { Minus, Plus } from "lucide-react";
-import { ZOOM_MIN, ZOOM_MAX, ZOOM_STEP, ZOOM_DEFAULT, clampZoom } from "@/lib/writing/page-metrics";
+import { ZOOM_MAX, ZOOM_MIN, ZOOM_STEP, ZOOM_DEFAULT, clampZoom } from "@/lib/writing/page-metrics";
+
+const nf = (n: number) => n.toLocaleString("pt-BR");
 
 /**
- * Barra de status inferior da Escrita: numeração de páginas, contagem de
- * palavras/caracteres e controle de zoom da folha. Fica fixa no rodapé da área.
+ * Barra de status inferior (28 px) do editor em tela cheia: página atual,
+ * contagens, progresso da meta e o controle de zoom da folha — na tipografia
+ * mono do design.
  */
 export function WritingStatusBar({
+  currentPage,
   pageCount,
   wordCount,
   charCount,
+  goal,
   zoom,
   onZoomChange,
 }: {
+  currentPage: number;
   pageCount: number;
   wordCount: number;
   charCount: number;
+  goal: number | null;
   zoom: number;
   onZoomChange: (zoom: number) => void;
 }) {
   const pct = Math.round(zoom * 100);
+  const goalPct = goal ? Math.min(100, Math.round((wordCount / goal) * 100)) : 0;
 
   return (
-    <div className="sticky bottom-0 z-20 -mx-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-xl border border-border-subtle bg-surface/85 px-3 py-1.5 text-xs text-text-dim backdrop-blur-md print:hidden">
-      <div className="flex items-center gap-3">
-        <span>
-          {pageCount} {pageCount === 1 ? "página" : "páginas"}
-        </span>
-        <span className="hidden h-3 w-px bg-border-subtle sm:block" aria-hidden />
-        <span className="tabular-nums">
-          {wordCount} {wordCount === 1 ? "palavra" : "palavras"}
-        </span>
-        <span className="tabular-nums text-text-dim/70">
-          {charCount} {charCount === 1 ? "caractere" : "caracteres"}
-        </span>
-      </div>
+    <div className="fx-status print:hidden">
+      <span>
+        Página {currentPage} de {pageCount}
+      </span>
+      <span className="fx-status-sep" aria-hidden />
+      <span className="tabular-nums">{nf(wordCount)} palavras</span>
+      <span className="tabular-nums" style={{ color: "rgba(236,234,231,.38)" }}>
+        {nf(charCount)} caracteres
+      </span>
 
-      <div className="flex items-center gap-1">
+      {goal !== null && (
+        <>
+          <span className="fx-status-sep" aria-hidden />
+          <span className="flex items-center gap-2">
+            <span style={{ letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(236,234,231,.4)" }}>
+              meta
+            </span>
+            <span className="fx-meter" role="progressbar" aria-valuenow={goalPct} aria-valuemin={0} aria-valuemax={100}>
+              <span style={{ right: `${100 - goalPct}%` }} />
+            </span>
+            <span className="tabular-nums" style={{ color: "rgba(236,234,231,.6)" }}>
+              {goalPct} % de {nf(goal)}
+            </span>
+          </span>
+        </>
+      )}
+
+      <span className="ml-auto flex items-center gap-2.5">
         <button
           type="button"
+          onClick={() => onZoomChange(clampZoom(zoom - ZOOM_STEP))}
+          disabled={zoom <= ZOOM_MIN}
           aria-label="Diminuir zoom"
           title="Diminuir zoom"
-          disabled={zoom <= ZOOM_MIN}
-          onClick={() => onZoomChange(clampZoom(zoom - ZOOM_STEP))}
-          className="grid size-6 place-items-center rounded-md text-text-dim transition-colors hover:bg-[color:color-mix(in_srgb,var(--color-accent)_10%,transparent)] hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
         >
-          <Minus size={13} />
+          −
         </button>
+        <input
+          type="range"
+          min={ZOOM_MIN * 100}
+          max={ZOOM_MAX * 100}
+          step={ZOOM_STEP * 100}
+          value={pct}
+          onChange={(e) => onZoomChange(clampZoom(Number(e.target.value) / 100))}
+          onDoubleClick={() => onZoomChange(ZOOM_DEFAULT)}
+          aria-label="Zoom da folha"
+          title="Zoom da folha (duplo clique volta a 100 %)"
+          className="fx-zoom"
+        />
         <button
           type="button"
-          title="Redefinir zoom (100%)"
-          onClick={() => onZoomChange(ZOOM_DEFAULT)}
-          className="min-w-[3.25rem] rounded-md px-1.5 py-0.5 text-center tabular-nums text-foreground transition-colors hover:bg-[color:color-mix(in_srgb,var(--color-accent)_10%,transparent)]"
-        >
-          {pct}%
-        </button>
-        <button
-          type="button"
+          onClick={() => onZoomChange(clampZoom(zoom + ZOOM_STEP))}
+          disabled={zoom >= ZOOM_MAX}
           aria-label="Aumentar zoom"
           title="Aumentar zoom"
-          disabled={zoom >= ZOOM_MAX}
-          onClick={() => onZoomChange(clampZoom(zoom + ZOOM_STEP))}
-          className="grid size-6 place-items-center rounded-md text-text-dim transition-colors hover:bg-[color:color-mix(in_srgb,var(--color-accent)_10%,transparent)] hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
         >
-          <Plus size={13} />
+          +
         </button>
-      </div>
+        <button
+          type="button"
+          onClick={() => onZoomChange(ZOOM_DEFAULT)}
+          title="Redefinir zoom (100 %)"
+          className="tabular-nums"
+          style={{ minWidth: 40, textAlign: "right", color: "var(--color-text)" }}
+        >
+          {pct} %
+        </button>
+      </span>
     </div>
   );
 }

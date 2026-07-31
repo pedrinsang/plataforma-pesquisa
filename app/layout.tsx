@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Lora, Caveat } from "next/font/google";
+import { Cormorant_Garamond, Lora, Caveat, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
 // Cormorant Garamond — títulos (serifada de display, corte 400–600).
@@ -27,6 +27,23 @@ const caveat = Caveat({
   display: "swap",
 });
 
+// IBM Plex Sans/Mono — chrome do editor de Escrita em tela cheia ("instrumento").
+// Fora dessa tela a interface segue Cormorant/Lora; aqui a sans e a mono dão a
+// leitura de painel técnico prevista no design.
+const plexSans = IBM_Plex_Sans({
+  variable: "--font-plex-sans",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  display: "swap",
+});
+
+const plexMono = IBM_Plex_Mono({
+  variable: "--font-plex-mono",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "Folium — plataforma de pesquisa científica",
   description:
@@ -42,7 +59,7 @@ export default function RootLayout({
     <html
       lang="pt-BR"
       suppressHydrationWarning
-      className={`${cormorant.variable} ${lora.variable} ${caveat.variable} h-full antialiased`}
+      className={`${cormorant.variable} ${lora.variable} ${caveat.variable} ${plexSans.variable} ${plexMono.variable} h-full antialiased`}
     >
       <head>
         <script

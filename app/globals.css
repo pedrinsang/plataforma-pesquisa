@@ -223,6 +223,87 @@
   color: var(--color-text);
 }
 
+/* Ilha de tinta — inverso do `.paper-light`. O editor de Escrita em tela cheia
+   é um "instrumento": chrome escuro em volta de uma folha branca, igual em tema
+   claro e escuro (o design não tem variante clara — a folha é que é o papel).
+   Reverte os tokens para os valores do `.dark` no escopo do shell, então tudo
+   que já usa os utilitários (popovers, menus, .input, .btn) herda a paleta.
+   `.folium-ink` é o mesmo conjunto de tokens sem o layout, para elementos que
+   saem do shell por portal (não é o caso hoje: os popovers vão para dentro do
+   próprio shell, mas fora dele a classe garante a mesma paleta). */
+.folium-shell,
+.folium-ink {
+  --color-bg: #181c1d;
+  --color-surface: #232829;
+  --color-text: #eceae7;
+  --color-divider: rgba(236, 234, 231, 0.15);
+
+  --color-accent: #5bb8c2;
+  --color-accent-100: rgba(91, 184, 194, 0.16);
+  --color-accent-200: rgba(91, 184, 194, 0.3);
+  --color-accent-300: rgba(91, 184, 194, 0.45);
+  --color-accent-400: #4fb0ba;
+  --color-accent-500: #6ac2cb;
+  --color-accent-600: #7fcdd5;
+  --color-accent-700: #a6dde3;
+  --color-accent-800: #c9ecef;
+  --color-accent-900: #e4f6f8;
+
+  --color-neutral-100: rgba(236, 234, 231, 0.07);
+  --color-neutral-200: rgba(236, 234, 231, 0.1);
+  --color-neutral-300: rgba(236, 234, 231, 0.18);
+  --color-neutral-400: rgba(236, 234, 231, 0.32);
+  --color-neutral-500: #9b9792;
+  --color-neutral-600: #b0aca7;
+  --color-neutral-700: #c2beb9;
+  --color-neutral-800: #cfccc8;
+  --color-neutral-900: #eceae7;
+
+  --color-background: #181c1d;
+  --color-foreground: #eceae7;
+  --color-surface-dim: #1f2526;
+  --color-border-subtle: rgba(236, 234, 231, 0.15);
+  --color-border-strong: rgba(236, 234, 231, 0.28);
+  --color-text-dim: rgba(236, 234, 231, 0.62);
+  --color-accent-teal: #5bb8c2;
+  --color-accent-teal-soft: rgba(91, 184, 194, 0.16);
+  --color-accent-gold: #d8ae5c;
+  --color-accent-gold-soft: color-mix(in srgb, #d8ae5c 16%, transparent);
+
+  --elev-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --elev-md: 0 4px 14px rgba(0, 0, 0, 0.5);
+  --elev-lg: 0 14px 36px rgba(0, 0, 0, 0.6);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -16px rgba(0, 0, 0, 0.6);
+  --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.35), 0 24px 50px -20px rgba(0, 0, 0, 0.7);
+
+  /* superfícies e traços próprios do chrome do editor */
+  --fx-chrome: #232829;
+  --fx-band: #1f2526;
+  --fx-rail: #0f1516;
+  --fx-line: rgba(236, 234, 231, 0.1);
+  --fx-line-strong: rgba(236, 234, 231, 0.16);
+  --fx-edge: rgba(236, 234, 231, 0.18);
+  --fx-dim: rgba(236, 234, 231, 0.62);
+  --fx-dimmer: rgba(236, 234, 231, 0.42);
+  --fx-faint: rgba(236, 234, 231, 0.34);
+  --fx-teal: #5bb8c2;
+  --fx-teal-soft: rgba(91, 184, 194, 0.16);
+  --fx-gold: #d8ae5c;
+  /* chão da área de rolagem — o `.paper-light` da folha NÃO redefine este nome,
+     então o vão entre páginas continua escuro dentro da ilha de papel */
+  --fx-ink-floor: #181c1d;
+
+  /* a sans/mono técnicas valem só dentro do shell */
+  --font-ui: var(--font-plex-sans), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
+
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.folium-shell { background: var(--color-bg); }
+
 /* ─────────────────────────────  base  ───────────────────────────── */
 body {
   background: var(--color-bg);
@@ -425,44 +506,505 @@ textarea.input { min-height: 90px; resize: vertical; }
    @layer, então vencem os estilos do typography na cascata. */
 .folium-editor:focus { outline: none; }
 
+/* Coluna flex em vez de blocos empilhados: em contexto flex as margens **não
+   colapsam**, então inserir/remover um espaçador de paginação entre dois
+   parágrafos não muda o espaço entre eles. É isso que faz a medição da
+   paginação convergir em vez de oscilar a cada passada. */
+.folium-editor {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.folium-editor > * { flex: 0 0 auto; }
+/* imagens não devem esticar na transversal do flex — mantêm o tamanho e centram */
+.folium-editor > img { align-self: center; }
+
+/* ── chrome do editor em tela cheia ────────────────────────────────────
+   Três linhas no topo (documento · abas da faixa · faixa agrupada), régua,
+   folha centralizada, trilho de painéis à direita e barra de status embaixo.
+   Todas as medidas vêm do design "Escrita — Editor em tela cheia". */
+.fx-row {
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding: 0 14px;
+  background: var(--fx-chrome);
+  border-bottom: 1px solid var(--fx-line);
+}
+.fx-topbar { height: 46px; gap: 14px; }
+.fx-tabbar { height: 34px; align-items: stretch; }
+.fx-mono {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fx-dim);
+  white-space: nowrap;
+}
+.fx-doc-title {
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--color-text);
+}
+.fx-doc-title:focus { outline: none; }
+.fx-doc-title::placeholder { color: var(--fx-dimmer); }
+
+/* botão quadrado contornado da barra do documento (30×30) */
+.fx-sq {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border: 1px solid var(--fx-edge);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+.fx-sq:hover { background: rgba(236, 234, 231, 0.08); }
+.fx-sq[aria-pressed="true"] { border-color: var(--fx-teal); color: var(--fx-teal); }
+
+/* botão com rótulo da barra do documento */
+.fx-act {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 11px;
+  flex: none;
+  border: 1px solid var(--fx-edge);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.14s ease;
+}
+.fx-act:hover { background: rgba(236, 234, 231, 0.08); }
+.fx-act-gold { border-color: rgba(216, 174, 92, 0.55); color: var(--fx-gold); }
+.fx-act-gold:hover { background: color-mix(in srgb, var(--fx-gold) 12%, transparent); }
+.fx-act-teal { border-color: var(--fx-teal); color: var(--fx-teal); font-weight: 500; }
+.fx-act-teal:hover { background: var(--fx-teal-soft); }
+.fx-act-danger { border-color: rgba(217, 139, 106, 0.5); color: #d98b6a; }
+.fx-act-danger:hover { background: rgba(217, 139, 106, 0.12); }
+
+.fx-avatar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 50%;
+  background: rgba(91, 184, 194, 0.3);
+  color: #c9ecef;
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 600;
+}
+.fx-vline { width: 1px; height: 20px; flex: none; background: rgba(236, 234, 231, 0.14); margin: 0 3px; }
+
+/* abas da faixa de opções */
+.fx-tab {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  color: var(--fx-dim);
+  cursor: pointer;
+  transition: color 0.14s ease, box-shadow 0.14s ease;
+}
+.fx-tab:hover { color: var(--color-text); }
+.fx-tab[aria-selected="true"] {
+  font-weight: 600;
+  color: var(--fx-teal);
+  box-shadow: inset 0 -2px 0 var(--fx-teal);
+}
+
+/* faixa agrupada */
+.fx-ribbon {
+  display: flex;
+  align-items: stretch;
+  height: 78px;
+  flex: none;
+  padding: 6px 14px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: var(--fx-chrome);
+  border-bottom: 1px solid var(--fx-line-strong);
+}
+.fx-ribbon::-webkit-scrollbar { display: none; }
+.fx-group { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0 12px; flex: none; }
+.fx-group-row { display: flex; align-items: center; gap: 2px; flex: 1; }
+.fx-group-label {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--fx-faint);
+  white-space: nowrap;
+}
+.fx-group-sep { width: 1px; flex: none; background: rgba(236, 234, 231, 0.12); margin: 6px 0 22px; }
+.fx-inline-sep { width: 1px; height: 20px; flex: none; background: rgba(236, 234, 231, 0.12); margin: 0 4px; }
+
+/* botão de ícone da faixa (32×32) */
+.fx-ico {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--fx-dim);
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.fx-ico:hover:not(:disabled) { background: rgba(236, 234, 231, 0.08); color: var(--color-text); }
+.fx-ico:disabled { color: rgba(236, 234, 231, 0.32); cursor: default; }
+.fx-ico[aria-pressed="true"], .fx-ico.is-open { background: var(--fx-teal-soft); color: var(--fx-teal); }
+
+/* botão grande com rótulo (aba Inserir) */
+.fx-big {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 60px;
+  height: 44px;
+  padding: 0 6px;
+  flex: none;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: rgba(236, 234, 231, 0.75);
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.fx-big:hover:not(:disabled) { background: rgba(236, 234, 231, 0.08); color: var(--color-text); }
+.fx-big:disabled { color: rgba(236, 234, 231, 0.3); cursor: default; }
+.fx-big[aria-pressed="true"], .fx-big.is-open {
+  background: var(--fx-teal-soft);
+  color: var(--fx-teal);
+  box-shadow: inset 0 0 0 1px rgba(91, 184, 194, 0.45);
+}
+
+/* combo/seletor contornado da faixa */
+.fx-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 32px;
+  padding: 0 9px;
+  flex: none;
+  border: 1px solid var(--fx-edge);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+.fx-select:hover { background: rgba(236, 234, 231, 0.06); }
+.fx-select.is-open { border-color: var(--fx-teal); }
+.fx-select > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* passo de tamanho de fonte (− 12 +) */
+.fx-stepper {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  flex: none;
+  border: 1px solid var(--fx-edge);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.fx-stepper button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  color: var(--fx-dim);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.fx-stepper button:hover { background: rgba(236, 234, 231, 0.08); color: var(--color-text); }
+.fx-stepper input {
+  width: 34px;
+  height: 30px;
+  border: 0;
+  border-left: 1px solid rgba(236, 234, 231, 0.12);
+  border-right: 1px solid rgba(236, 234, 231, 0.12);
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.fx-stepper input:focus { outline: none; background: rgba(236, 234, 231, 0.06); }
+
+/* marca de cor abaixo do glifo (cor do texto / destaque) */
+.fx-swatch { display: block; width: 17px; height: 3px; border-radius: 1px; }
+
+/* trilho de painéis (direita) */
+.fx-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 44px;
+  flex: none;
+  padding: 8px 0;
+  background: var(--fx-rail);
+  border-left: 1px solid rgba(236, 234, 231, 0.12);
+}
+.fx-rail-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 34px;
+  padding: 9px 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: rgba(236, 234, 231, 0.55);
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.fx-rail-item:hover:not(:disabled) { background: rgba(236, 234, 231, 0.08); color: var(--color-text); }
+.fx-rail-item:disabled { color: var(--fx-dimmer); cursor: default; }
+.fx-rail-item[aria-pressed="true"] { background: var(--fx-teal-soft); color: var(--fx-teal); }
+.fx-rail-label {
+  writing-mode: vertical-rl;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.fx-rail-badge {
+  position: absolute;
+  top: 5px;
+  right: 1px;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 3px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--fx-gold);
+  color: #181c1d;
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  font-weight: 600;
+}
+.fx-rail-sep { width: 20px; height: 1px; flex: none; background: rgba(236, 234, 231, 0.18); margin: 7px 0; }
+
+/* painel encaixado (Estatísticas, Sumário) */
+.fx-panel {
+  display: flex;
+  flex-direction: column;
+  width: 392px;
+  flex: none;
+  min-height: 0;
+  background: var(--fx-rail);
+  border-left: 1px solid rgba(91, 184, 194, 0.28);
+  box-shadow: -22px 0 48px -16px rgba(0, 0, 0, 0.85);
+}
+.fx-panel-head {
+  flex: none;
+  padding: 13px 15px;
+  border-bottom: 1px solid rgba(236, 234, 231, 0.12);
+  background-image:
+    linear-gradient(to right, rgba(91, 184, 194, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(91, 184, 194, 0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.fx-panel-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fx-teal);
+}
+.fx-panel-btn {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border: 1px solid rgba(236, 234, 231, 0.16);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: rgba(236, 234, 231, 0.55);
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.fx-panel-btn:hover { background: rgba(236, 234, 231, 0.08); color: var(--color-text); }
+.fx-panel-search {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px 0 32px;
+  border: 1px solid rgba(236, 234, 231, 0.16);
+  border-radius: var(--radius-md);
+  background: #0a0f10;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+.fx-panel-search::placeholder { color: rgba(236, 234, 231, 0.45); }
+.fx-panel-search:focus { outline: none; border-color: var(--fx-teal); }
+
+/* barra de status */
+.fx-status {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 28px;
+  flex: none;
+  padding: 0 14px;
+  background: var(--fx-chrome);
+  border-top: 1px solid rgba(236, 234, 231, 0.12);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: rgba(236, 234, 231, 0.55);
+  white-space: nowrap;
+}
+.fx-status-sep { width: 1px; height: 11px; flex: none; background: rgba(236, 234, 231, 0.16); }
+.fx-status button { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.fx-status button:hover { color: var(--color-text); }
+.fx-meter {
+  position: relative;
+  width: 78px;
+  height: 4px;
+  flex: none;
+  border-radius: 2px;
+  background: rgba(236, 234, 231, 0.14);
+  overflow: hidden;
+}
+.fx-meter > span { position: absolute; inset: 0 auto 0 0; background: var(--fx-gold); }
+
+/* controle de zoom — trilho fino com punho petróleo */
+.fx-zoom {
+  width: 96px;
+  height: 12px;
+  flex: none;
+  background: transparent;
+  appearance: none;
+  cursor: pointer;
+}
+.fx-zoom::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(236, 234, 231, 0.16);
+}
+.fx-zoom::-moz-range-track {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(236, 234, 231, 0.16);
+}
+.fx-zoom::-webkit-slider-thumb {
+  appearance: none;
+  width: 9px;
+  height: 10px;
+  margin-top: -3.5px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--fx-teal);
+}
+.fx-zoom::-moz-range-thumb {
+  width: 9px;
+  height: 10px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--fx-teal);
+}
+
 /* ── simulação de folha de papel (estilo Word) ──────────────────────────
    A folha é SEMPRE clara ("como imprimir"), exceção intencional do design; o
    `.paper-light` reverte os tokens para os valores claros no escopo da folha,
    então tabelas/citações/dividers ficam corretos mesmo no tema escuro. */
+/* Container de rolagem da folha. Bloco com margem automática (e não flex
+   centralizado) para que, com zoom alto, a borda esquerda continue alcançável
+   pela barra de rolagem. */
 .folium-canvas {
-  display: flex;
-  justify-content: center;
+  flex: 1;
+  min-height: 0;
   overflow: auto;
-  max-height: calc(100dvh - 14rem);
-  padding: 2rem 1.5rem 3rem;
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-text) 8%, var(--color-bg));
+  padding: 22px 0 40px;
+  background: transparent;
 }
-.folium-zoom-sizer { flex: none; }
+.folium-zoom-sizer { margin: 0 auto; }
 .folium-zoom { position: relative; }
 
-.folium-page {
+/* Pilha de folhas: cada página é uma caixa branca própria, com vão entre elas.
+   O texto é um fluxo contínuo (`.folium-flow`) posicionado por cima, dentro das
+   margens — a extensão `foliumPagination` reserva o vão para que nenhum bloco
+   seja cortado na virada da folha. */
+.folium-stack {
   position: relative;
   box-sizing: border-box;
-  background: #ffffff;
   color: #1c1b19;
+  font-family: var(--font-body);
+}
+.folium-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: #ffffff;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14), 0 14px 38px rgba(0, 0, 0, 0.22);
 }
-.folium-page .folium-editor { color: #1c1b19; min-height: calc(29.7cm - 5cm); }
-
-/* overlay de guias/numeração — sobre a folha, sem capturar cliques */
-.folium-page-guides { position: absolute; inset: 0; pointer-events: none; }
-.folium-page-guide {
-  position: absolute; left: 0; right: 0;
-  border-top: 1px dashed color-mix(in srgb, var(--color-accent-teal) 40%, transparent);
+.folium-flow { position: absolute; color: #1c1b19; }
+/* Vão entre duas folhas: chão escuro + as duas bordas de papel em sombra. Fica
+   acima do texto, então mascara um bloco alto demais que atravesse a virada. */
+.folium-seam {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--fx-ink-floor, #181c1d);
+  box-shadow:
+    inset 0 9px 10px -9px rgba(0, 0, 0, 0.6),
+    inset 0 -9px 10px -9px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
 }
+/* espaçador de paginação — puro vão, sem margem para não colapsar nada */
+.folium-page-spacer { display: block; margin: 0; padding: 0; pointer-events: none; }
+
+/* Via de impressão: vazia na tela; o `WritingCanvas` só a preenche no
+   `beforeprint`, com uma folha recortada por página (ver @media print). */
+.folium-print { display: none; }
+
+/* overlay de cabeçalho/rodapé/numeração — nas margens, sem capturar cliques */
+.folium-page-overlay { position: absolute; inset: 0; pointer-events: none; }
 .folium-page-num {
   position: absolute; left: 50%; transform: translate(-50%, -50%);
   padding: 1px 9px; border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
-  color: #8c8b86; white-space: nowrap;
+  font-size: 10px; letter-spacing: 0.08em;
+  color: #a3a19b; white-space: nowrap;
 }
 
 /* tabelas */
@@ -500,17 +1042,132 @@ textarea.input { min-height: 90px; resize: vertical; }
   border-radius: var(--radius-md);
 }
 
-/* quebra de página */
+/* Quebra de página explícita. O salto em si é feito pela paginação (o conteúdo
+   seguinte começa no topo da folha de baixo); aqui fica só o selo que marca onde
+   a quebra foi pedida. */
 .folium-editor .folium-page-break {
-  position: relative; height: 0; margin: 1.6em 0;
-  border-top: 2px dashed color-mix(in srgb, var(--color-accent) 45%, transparent);
+  position: relative; height: 0; margin: 0.9em 0;
+  border-top: 1px dashed color-mix(in srgb, var(--color-accent) 55%, transparent);
 }
 .folium-editor .folium-page-break::after {
   content: "Quebra de página"; position: absolute; left: 50%; top: 50%;
   transform: translate(-50%, -50%);
-  background: var(--color-surface); padding: 0 10px;
-  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em;
-  text-transform: uppercase; color: var(--color-text-dim);
+  background: #ffffff; padding: 0 9px;
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: color-mix(in srgb, var(--color-accent) 80%, transparent);
+}
+
+/* cabeçalho/rodapé por página — tinta de papel (a folha é sempre clara) */
+.folium-hf {
+  position: absolute;
+  font-family: var(--font-lora), Georgia, serif;
+  font-size: 12px;
+  line-height: 1.2;
+  color: #6b6a66;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.folium-hf-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding-bottom: 3px;
+}
+.folium-hf-footer {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding-top: 3px;
+  text-align: center;
+}
+
+/* régua horizontal (estilo Word) — faixa fina acima da folha, fixa (não rola) */
+/* altura vem do componente (24 px × zoom, para a régua nunca ser cortada) */
+.fx-rulerband {
+  flex: none;
+  overflow: hidden;
+  background: var(--fx-band);
+  border-bottom: 1px solid var(--fx-line);
+}
+.folium-ruler {
+  position: relative;
+  box-sizing: border-box;
+  user-select: none;
+  touch-action: none;
+}
+/* trilho da folha inteira (margens incluídas) */
+.folium-ruler::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 6px;
+  bottom: 6px;
+  background: #131718;
+  border-radius: 2px;
+}
+/* área de conteúdo, entre as margens */
+.folium-ruler-content {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  background: #2b3132;
+  border-radius: 2px;
+}
+.folium-ruler-tick {
+  position: absolute;
+  top: 7px;
+  height: 3px;
+  width: 1px;
+  background: rgba(236, 234, 231, 0.28);
+  transform: translateX(-0.5px);
+}
+.folium-ruler-tick-major {
+  height: 5px;
+  background: rgba(236, 234, 231, 0.42);
+}
+.folium-ruler-num {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  line-height: 1;
+  color: rgba(236, 234, 231, 0.4);
+  white-space: nowrap;
+}
+.folium-ruler-marker {
+  position: absolute;
+  width: 11px;
+  height: 8px;
+  transform: translateX(-50%);
+  background: var(--fx-teal);
+  cursor: ew-resize;
+  padding: 0;
+  border: none;
+  transition: filter 0.12s ease;
+}
+.folium-ruler-marker:hover {
+  filter: brightness(1.15);
+}
+/* primeira linha: triângulo no topo apontando para baixo */
+.folium-ruler-firstline {
+  top: 1px;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+/* esquerda/direita: triângulo na base apontando para cima */
+.folium-ruler-left,
+.folium-ruler-right {
+  bottom: 1px;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+/* localizar e substituir — destaque das ocorrências na folha */
+.folium-editor .folium-search-match {
+  background: color-mix(in srgb, var(--color-accent-gold) 42%, transparent);
+  border-radius: 2px;
+}
+.folium-editor .folium-search-current {
+  background: color-mix(in srgb, var(--color-accent-teal) 45%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent-teal) 70%, transparent);
 }
 
 /* placeholder de citação com um filete dourado (identidade "manuscrito") */
@@ -519,18 +1176,95 @@ textarea.input { min-height: 90px; resize: vertical; }
   font-style: italic;
 }
 
-@media print {
-  .folium-editor .folium-page-break { break-after: page; border: 0; height: 0; }
-  .folium-editor .folium-page-break::after { display: none; }
+/* ══════════════════════  impressão / exportar PDF  ══════════════════════
+   "Imprimir" e "Baixar PDF" saem **só a folha**, e exatamente como está na tela:
+   nada de chrome do editor nem da sidebar/topbar/abas do app por baixo do shell.
 
-  /* Ao imprimir/exportar PDF, a folha vira a própria página: sem canvas,
-     sem sombra, sem zoom, sem guias na tela. O motor de impressão pagina. */
-  .folium-canvas { max-height: none; overflow: visible; padding: 0; background: #fff; display: block; }
-  .folium-zoom-sizer,
-  .folium-zoom { width: auto !important; height: auto !important; transform: none !important; }
-  .folium-page { box-shadow: none; width: auto !important; min-height: 0 !important; padding: 0 !important; }
-  .folium-page .folium-editor { min-height: 0 !important; }
-  .folium-page-guides { display: none !important; }
+   Quem monta o papel é o `WritingCanvas`: no `beforeprint` ele preenche
+   `.folium-print` com uma folha A4 por página, cada uma recortando um clone da
+   pilha na altura daquela página. Assim a paginação impressa é a **mesma** que
+   foi medida na tela (com cabeçalho, rodapé e numeração no lugar) — o motor de
+   impressão não reparte nada, só empurra cada folha para uma página.
+
+   As regras `:has()` fazem o caminho da raiz até `.folium-print` continuar
+   visível e esconder todo o resto, sem JS marcando classes. */
+@media print {
+  /* A folha clonada já traz as margens desenhadas dentro dela; o page box, não. */
+  @page { size: A4 portrait; margin: 0; }
+
+  html, body {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #1c1b19 !important;
+  }
+
+  /* Só vale quando existe um editor em tela cheia na página — nas outras telas
+     a impressão continua saindo normal. */
+  body:has(.folium-shell) :not(:has(.folium-shell)):not(.folium-shell):not(.folium-shell *) {
+    display: none !important;
+  }
+  /* Dentro do shell sobra apenas a via de impressão: chrome, régua, trilho,
+     painéis e a pilha da tela (com zoom, sombra e vão) saem de cena. */
+  .folium-shell *:not(.folium-print):not(.folium-print *):not(:has(.folium-print)) {
+    display: none !important;
+  }
+
+  /* O caminho até a via de impressão — ancestrais do shell, o shell (que sai do
+     `fixed`, senão só a primeira página sairia) e os ancestrais do
+     `.folium-print` — vira caixa neutra: sem posicionamento, padding, limite de
+     largura ou rolagem. */
+  body:has(.folium-shell) :has(.folium-shell),
+  .folium-shell,
+  .folium-shell :has(.folium-print) {
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    flex: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    max-width: none !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #1c1b19 !important;
+    box-shadow: none !important;
+  }
+
+  .folium-print {
+    display: block !important;
+    /* fundos e realces do texto precisam sair no papel */
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Uma folha por página: recorte de A4 sobre o clone da pilha, deslocado até o
+     topo daquela folha (o `top` vem inline, calculado pelo canvas). As medidas
+     ficam um fio abaixo do A4 real para que arredondamento nenhum gere uma
+     página em branco entre as folhas. */
+  .folium-print-page {
+    position: relative !important;
+    width: 209.9mm;
+    height: 296.8mm;
+    overflow: hidden;
+    background: #fff;
+    break-inside: avoid;
+    break-after: page;
+  }
+  .folium-print-page:last-child { break-after: auto; }
+  .folium-print-window { position: absolute !important; left: 0; }
+
+  /* No papel a folha não tem sombra, o vão entre folhas não existe e o selo da
+     quebra de página não se imprime — a geometria, porém, fica intacta. */
+  .folium-print .folium-sheet { box-shadow: none !important; }
+  .folium-print .folium-seam { display: none !important; }
+  .folium-print .folium-page-break { border-top-color: transparent !important; }
+  .folium-print .folium-page-break::after { display: none !important; }
 }
 
 /* ─────────────────────  transição de tema (claro↔escuro)  ────────────

@@ -55,6 +55,17 @@ function loadSource(statId: string, force = false): Promise<StatSourceData | nul
   return promise;
 }
 
+const REFRESH_EVENT = "folium:stat-refresh";
+
+/**
+ * "Atualizar vínculos" da faixa: descarta o cache e manda todos os blocos de
+ * estatística do documento buscarem os dados de novo.
+ */
+export function refreshAllStatSources() {
+  sourceCache.clear();
+  window.dispatchEvent(new Event(REFRESH_EVENT));
+}
+
 function formatCell(value: unknown): string {
   if (value === null || value === undefined || value === "") return "—";
   if (typeof value === "boolean") return value ? "Sim" : "Não";
@@ -75,6 +86,12 @@ function StatChartView({ node, updateAttributes, deleteNode, editor, selected }:
       setStatus(data ? "ready" : "missing");
     });
   }, [statId]);
+
+  // Recarrega quando a faixa dispara "Atualizar vínculos".
+  useEffect(() => {
+    window.addEventListener(REFRESH_EVENT, refetch);
+    return () => window.removeEventListener(REFRESH_EVENT, refetch);
+  }, [refetch]);
 
   // Busca inicial / ao trocar de fonte: estado só muda após o await.
   useEffect(() => {

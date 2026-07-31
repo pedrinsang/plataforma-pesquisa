@@ -11,6 +11,24 @@ export const PAGE_WIDTH_PX = Math.round(PAGE_WIDTH_CM * PX_PER_CM); // ~794
 export const PAGE_HEIGHT_PX = Math.round(PAGE_HEIGHT_CM * PX_PER_CM); // ~1123
 export const PAGE_MARGIN_PX = Math.round(PAGE_MARGIN_CM * PX_PER_CM); // ~94
 
+/** Vão visível entre duas folhas empilhadas (chão escuro aparecendo). */
+export const PAGE_GAP_PX = 20;
+
+/** Altura útil de texto dentro de uma folha (entre as margens). */
+export const CONTENT_HEIGHT_PX = PAGE_HEIGHT_PX - PAGE_MARGIN_PX * 2;
+
+/** Largura útil de texto dentro de uma folha. */
+export const CONTENT_WIDTH_PX = PAGE_WIDTH_PX - PAGE_MARGIN_PX * 2;
+
+/**
+ * Distância do topo de uma folha ao topo da seguinte. O fluxo de texto é
+ * contínuo, então "pular de página" = avançar uma passada destas.
+ */
+export const PAGE_STRIDE_PX = PAGE_HEIGHT_PX + PAGE_GAP_PX;
+
+/** Altura da faixa da régua horizontal (acima da folha, fora do zoom). */
+export const RULER_HEIGHT_PX = 24;
+
 // Zoom da folha (estilo Word/Docs).
 export const ZOOM_MIN = 0.5;
 export const ZOOM_MAX = 2;
@@ -21,12 +39,25 @@ export function clampZoom(z: number): number {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 100) / 100));
 }
 
+/** Posição (px) do topo da folha `page` (base 0) na pilha de folhas. */
+export function sheetTop(page: number): number {
+  return page * PAGE_STRIDE_PX;
+}
+
+/** Altura total da pilha de `count` folhas, já contando os vãos. */
+export function stackHeight(count: number): number {
+  return Math.max(1, count) * PAGE_STRIDE_PX - PAGE_GAP_PX;
+}
+
 /**
- * Quantas folhas A4 o conteúdo ocupa. `contentHeightPx` é a altura só do
- * conteúdo (sem as margens da folha); somamos a margem de topo e de rodapé antes
- * de dividir pela altura da página.
+ * Em que folha (base 0) cai uma posição `y` do fluxo de texto, medida a partir
+ * do topo da área de texto da primeira folha.
  */
-export function pageCountFor(contentHeightPx: number): number {
-  const used = contentHeightPx + PAGE_MARGIN_PX * 2;
-  return Math.max(1, Math.ceil(used / PAGE_HEIGHT_PX));
+export function pageOfFlowY(y: number): number {
+  return Math.max(0, Math.floor(y / PAGE_STRIDE_PX));
+}
+
+/** Último `y` de fluxo que ainda cabe na folha `page`. */
+export function pageContentBottom(page: number): number {
+  return page * PAGE_STRIDE_PX + CONTENT_HEIGHT_PX;
 }

@@ -14,7 +14,10 @@ import { TableKit } from "@tiptap/extension-table";
 import { LineHeight } from "@/lib/writing/extensions/line-height";
 import { ParagraphSpacing } from "@/lib/writing/extensions/paragraph-spacing";
 import { Indent } from "@/lib/writing/extensions/indent";
+import { ParagraphIndent } from "@/lib/writing/extensions/paragraph-indent";
 import { PageBreak } from "@/lib/writing/extensions/page-break";
+import { Pagination } from "@/lib/writing/extensions/pagination";
+import { SearchReplace } from "@/lib/writing/extensions/search-replace";
 import { StatChart } from "@/lib/writing/extensions/stat-chart";
 
 // Famílias de fonte curadas para a Escrita. As duas primeiras são as fontes da
@@ -79,7 +82,10 @@ export function buildEditorExtensions() {
     LineHeight,
     ParagraphSpacing,
     Indent,
+    ParagraphIndent,
     PageBreak,
+    Pagination,
+    SearchReplace,
     StatChart,
   ];
 }

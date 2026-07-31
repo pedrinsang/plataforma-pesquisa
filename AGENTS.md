@@ -60,6 +60,11 @@ Linguagem **editorial, tipo livro**, derivada do design system "Classical"
   projeto usam `ProjectTabs`. Ícones: **Lucide**.
 - **Marca**: `AppMark` = agulha de bússola inscrita num círculo; wordmark
   "Folium" em Cormorant.
+- **Ilhas de tema**: `.paper-light` força os tokens claros (papel sobre fundo
+  escuro) e `.folium-shell` faz o inverso — força os tokens do `.dark` no editor
+  de Escrita em tela cheia, que é "instrumento" e fica escuro nos dois temas,
+  com a folha branca no centro. Dentro do shell a UI usa **IBM Plex Sans/Mono**
+  (`--font-plex-sans`/`--font-plex-mono`); fora dele, Cormorant + Lora.
 - Animações (reveals de scroll na landing) respeitam `prefers-reduced-motion`
   com estado estático equivalente. Ao mexer em UI, conferir claro **e** escuro.
 
@@ -77,8 +82,28 @@ planilha de dados (react-data-grid), dark/light, **segurança reforçada**
 (RLS por papel, rate limit de login, `audit_log`), **convites de participantes
 com aceite do convidado**, **redesign visual completo — sistema "Folium"**
 (editorial/petróleo, Cormorant + Lora, claro/escuro), **timeline/marcos**
-(linha do tempo com CRUD e reordenação) e **amostras/coleta** (CRUD em
-`statistics/samples`, alimenta o card e o gráfico semanal da visão geral).
+(linha do tempo com CRUD e reordenação), **amostras/coleta** (CRUD em
+`statistics/samples`, alimenta o card e o gráfico semanal da visão geral) e
+**recursos "estilo Word" no editor**: folha direto na página (sem a moldura
+cinza — rola com a página), **localizar e substituir** (Ctrl+F/Ctrl+H, extensão
+`search-replace` com decorações), **sumário/navegação** (`OutlinePanel`, rola até
+o título), **régua horizontal** com recuos arrastáveis (`WritingRuler` +
+extensão `paragraph-indent`, esquerda/direita/primeira linha em px) e
+**cabeçalho/rodapé por página** (`HeaderFooterControl`, tokens `{n}`/`{total}`,
+render no overlay do `WritingCanvas`). O editor de um documento agora é uma
+**tela cheia** (design "Escrita — Editor em tela cheia", Claude Design):
+`.folium-shell` (`fixed inset-0`) com três linhas de chrome — barra do documento
+(46 px), abas da faixa (34 px: Início · Inserir · Layout · Revisão · Referências)
+e faixa agrupada (78 px, grupos com rótulo em versalete) —, faixa da régua
+(24 px, fora da rolagem), folha centralizada, **trilho de painéis** à direita
+(44 px: Estatísticas e Sumário funcionam; Referências/Artigos/Notas/Versões ficam
+apagados "em breve") e barra de status (28 px: página atual, contagens, meta e
+zoom). Arquivos: `DocumentTopBar`, `RibbonTabs`, `ribbon/*`, `SideRail`,
+`WritingStatusBar`, `WritingCanvas`, `WritingRuler` (`RulerBand`), `ui.tsx`.
+A folha deixou de ser contínua: agora é uma **pilha de páginas A4 separadas**
+com vão real entre elas e **paginação por medição** (`extensions/pagination.ts`
++ `planPages` no `WritingCanvas`) — nenhum parágrafo é cortado na virada, e a
+quebra de página explícita consome o resto da folha de verdade.
 
 Falta (do brief): feed de atividade (pode vir do `audit_log`), status do
 projeto, biblioteca de **referências/citações** (inserção via "@" no editor),
@@ -89,4 +114,30 @@ importação CSV/Excel, **campos customizáveis** das amostras e **achados**.
 Notas: o editor já tem link e imagem — quando o conteúdo for renderizado fora do
 TipTap (export/print), avaliar sanitização XSS do HTML. Upload de imagem usa o
 bucket `writing-images` (migration `20260727120000`; rodar `npx supabase db push`).
-Convites não enviam e-mail (vinculam por `invited_email` no cadastro).
+Cabeçalho/rodapé precisam da migration `20260728120000_document_header_footer`
+(colunas `header_text`/`footer_text` em `documents`) — **rodar `npx supabase db
+push`**; até lá a busca é tolerante (campos vazios, editor não quebra).
+A paginação é **medida no cliente** (não é do ProseMirror): `WritingCanvas` lê a
+geometria dos blocos de primeiro nível e manda espaçadores para a extensão
+`foliumPagination`, que os desenha como widget decorations. Duas coisas seguram
+isso de pé e não devem ser desfeitas: `.folium-editor` é `display:flex;
+flex-direction:column` (em contexto flex as margens **não colapsam**, senão
+inserir/remover espaçador muda o espaço entre parágrafos e a medição oscila) e o
+agendamento usa `setTimeout`, não `requestAnimationFrame` (rAF não roda em aba
+oculta). Um bloco mais alto que uma folha (tabela/imagem grande) ainda atravessa
+a virada — o `.folium-seam` mascara o vão. Convites não enviam e-mail (vinculam
+por `invited_email` no cadastro). No editor em tela cheia, "Baixar PDF" e
+"Imprimir" são o mesmo `window.print()`, e o papel sai **igual à tela**: no
+`beforeprint` o `WritingCanvas` monta a **via de impressão** (`.folium-print`) —
+uma folha A4 por página, cada uma recortando (`overflow:hidden`) um clone da
+pilha deslocado pelo topo daquela folha —, e o `afterprint` esvazia. Ou seja, a
+paginação impressa é a **mesma medida na tela**, com cabeçalho/rodapé/numeração
+no lugar; o motor de impressão não reparte nada (`@page margin: 0`, as margens
+vêm desenhadas dentro do clone). O `@media print` esconde o resto com `:has()`:
+o que não é o shell nem ancestral dele (sidebar, topbar, abas do projeto) e, dentro
+do shell, tudo que não é `.folium-print` nem ancestral dele (chrome, régua, trilho,
+painéis, a pilha da tela com zoom/sombra/vão). Por isso **não se deve mexer nas
+alturas do clone** (inclusive espaçadores) no CSS de impressão — só no que é
+puramente visual (sombra da folha, vão, selo da quebra). As abas Referências e os
+itens apagados do trilho ficam desabilitados até a biblioteca de referências
+existir.

@@ -124,6 +124,8 @@ export interface Database {
           content_json: unknown;
           template_type: string | null;
           word_goal: number | null;
+          header_text: string | null;
+          footer_text: string | null;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -135,6 +137,8 @@ export interface Database {
           content_json?: unknown;
           template_type?: string | null;
           word_goal?: number | null;
+          header_text?: string | null;
+          footer_text?: string | null;
           created_by: string;
         };
         Update: {
@@ -142,6 +146,8 @@ export interface Database {
           content_json?: unknown;
           template_type?: string | null;
           word_goal?: number | null;
+          header_text?: string | null;
+          footer_text?: string | null;
         };
         Relationships: [
           {

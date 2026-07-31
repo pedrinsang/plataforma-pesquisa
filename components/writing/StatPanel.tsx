@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Search, X, Table2, Clock3, RefreshCw, Inbox } from "lucide-react";
+import { Clock3, Inbox, RefreshCw, Search, Table2, X } from "lucide-react";
 import {
   listStatSources,
   type StatSourceSummary,
@@ -31,17 +31,15 @@ function pushRecent(projectId: string, statId: string) {
 }
 
 /**
- * Painel lateral de inserção de estatística (estilo Canva): busca no topo,
- * "Usados recentemente" e grade de miniaturas. Não perde a posição do cursor
- * no texto — o Editor devolve o foco/seleção ao inserir.
+ * Painel de estatísticas encaixado no trilho da direita: busca no topo sobre a
+ * grade técnica, "Usados recentemente" e grade de miniaturas. Não perde a
+ * posição do cursor no texto — o editor devolve o foco/seleção ao inserir.
  */
 export function StatPanel({
-  open,
   projectId,
   onClose,
   onInsert,
 }: {
-  open: boolean;
   projectId: string;
   onClose: () => void;
   onInsert: (statId: string, kind: StatSourceKind) => void;
@@ -59,9 +57,8 @@ export function StatPanel({
     });
   }, [projectId]);
 
-  // Busca ao abrir: estado só muda após o await.
+  // Busca ao montar: estado só muda após o await.
   useEffect(() => {
-    if (!open) return;
     let cancelled = false;
     void listStatSources(projectId).then((data) => {
       if (cancelled) return;
@@ -71,16 +68,15 @@ export function StatPanel({
     return () => {
       cancelled = true;
     };
-  }, [open, projectId]);
+  }, [projectId]);
 
   useEffect(() => {
-    if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [onClose]);
 
   const filtered = useMemo(() => {
     if (!sources) return null;
@@ -105,49 +101,38 @@ export function StatPanel({
   }
 
   return (
-    <div
-      className={cn(
-        "fixed inset-y-0 right-0 z-40 flex w-[min(22rem,100vw)] flex-col border-l border-border-subtle bg-surface shadow-lift transition-transform duration-200",
-        open ? "translate-x-0" : "pointer-events-none translate-x-full",
-      )}
-      role="dialog"
-      aria-label="Inserir gráfico ou estatística"
-      aria-hidden={!open}
-    >
-      {/* Cabeçalho + busca */}
-      <div className="border-b border-border-subtle p-4">
+    <aside className="fx-panel print:hidden" aria-label="Inserir estatística">
+      <div className="fx-panel-head">
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-[0.62rem] uppercase tracking-[0.14em] text-accent-teal">
-            Inserir estatística
-          </p>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={reload}
-              className="ib !size-7"
-              aria-label="Recarregar"
-              title="Recarregar"
-            >
-              <RefreshCw size={14} />
+          <span className="fx-panel-title">
+            Estatísticas · {sources?.length ?? 0} {(sources?.length ?? 0) === 1 ? "saída" : "saídas"}
+          </span>
+          <span className="flex items-center gap-2">
+            <button type="button" className="fx-panel-btn" onClick={reload} title="Recarregar" aria-label="Recarregar">
+              <RefreshCw size={12} />
             </button>
-            <button type="button" onClick={onClose} className="ib !size-7" aria-label="Fechar">
-              <X size={15} />
+            <button type="button" className="fx-panel-btn" onClick={onClose} title="Fechar" aria-label="Fechar">
+              <X size={12} />
             </button>
-          </div>
+          </span>
         </div>
+
         <div className="relative">
-          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-dim" />
+          <Search
+            size={14}
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2"
+            style={{ color: "rgba(236,234,231,.45)" }}
+          />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar gráfico ou estatística…"
-            className="input h-9 w-full pl-9 text-sm"
+            placeholder="buscar gráfico, tabela, variável…"
+            className="fx-panel-search"
           />
         </div>
       </div>
 
-      {/* Conteúdo */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {filtered === null ? (
           <div className="flex items-center gap-2 py-8 text-sm text-text-dim">
             <RefreshCw size={14} className="animate-spin" /> Carregando…
@@ -155,19 +140,19 @@ export function StatPanel({
         ) : filtered.length === 0 ? (
           <EmptyState hasQuery={Boolean(query.trim())} />
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-5">
             {recentSources.length > 0 && (
-              <Section icon={<Clock3 size={12} />} title="Usados recentemente">
-                <Grid sources={recentSources} onInsert={handleInsert} />
+              <Section icon={<Clock3 size={11} />} title="Usados recentemente">
+                <Grid sources={recentSources} onInsert={handleInsert} highlight />
               </Section>
             )}
-            <Section icon={<Table2 size={12} />} title="Tabelas">
+            <Section icon={<Table2 size={11} />} title="Todas as planilhas">
               <Grid sources={filtered} onInsert={handleInsert} />
             </Section>
           </div>
         )}
       </div>
-    </div>
+    </aside>
   );
 }
 
@@ -182,7 +167,16 @@ function Section({
 }) {
   return (
     <div>
-      <p className="mb-2 flex items-center gap-1.5 font-mono text-[0.62rem] uppercase tracking-[0.14em] text-text-dim">
+      <p
+        className="mb-2 flex items-center gap-1.5"
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: "9.5px",
+          letterSpacing: "0.16em",
+          textTransform: "uppercase",
+          color: "rgba(236,234,231,.4)",
+        }}
+      >
         {icon}
         {title}
       </p>
@@ -194,42 +188,57 @@ function Section({
 function Grid({
   sources,
   onInsert,
+  highlight = false,
 }: {
   sources: StatSourceSummary[];
   onInsert: (s: StatSourceSummary) => void;
+  highlight?: boolean;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-2 gap-2.5">
       {sources.map((s) => (
         <button
           key={s.id}
           type="button"
           onClick={() => onInsert(s)}
-          className="group flex flex-col gap-2 rounded-lg border border-border-subtle bg-surface-dim/40 p-2.5 text-left transition-all hover:-translate-y-0.5 hover:border-accent-teal hover:shadow-card"
           title={`Inserir “${s.name}”`}
+          className={cn(
+            "group overflow-hidden rounded-[5px] border text-left transition-colors",
+            highlight ? "border-accent-teal/40" : "border-border-subtle",
+            "hover:border-accent-teal",
+          )}
+          style={{ background: "#0d1213" }}
         >
-          {/* Miniatura esquemática da tabela */}
-          <div className="grid h-16 place-items-center overflow-hidden rounded-md border border-border-subtle bg-surface">
-            <div className="w-full space-y-1 px-2">
+          {/* Miniatura esquemática da planilha, sobre papel */}
+          <div className="h-[70px] overflow-hidden px-1.5 py-1.5" style={{ background: "#f7f6f2" }}>
+            <div className="space-y-1">
               <div className="flex gap-1">
-                {Array.from({ length: Math.min(s.columnCount || 2, 3) }).map((_, i) => (
-                  <span key={i} className="h-1.5 flex-1 rounded-sm bg-accent-teal/40" />
+                {Array.from({ length: Math.min(s.columnCount || 2, 4) }).map((_, i) => (
+                  <span key={i} className="h-[5px] flex-1 rounded-[1px]" style={{ background: "#146b74", opacity: 0.75 }} />
                 ))}
               </div>
-              {Array.from({ length: 3 }).map((_, r) => (
+              {Array.from({ length: 4 }).map((_, r) => (
                 <div key={r} className="flex gap-1">
-                  {Array.from({ length: Math.min(s.columnCount || 2, 3) }).map((_, i) => (
-                    <span key={i} className="h-1 flex-1 rounded-sm bg-border-strong/40" />
+                  {Array.from({ length: Math.min(s.columnCount || 2, 4) }).map((_, i) => (
+                    <span key={i} className="h-[4px] flex-1 rounded-[1px]" style={{ background: "#c9c6bd" }} />
                   ))}
                 </div>
               ))}
             </div>
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-xs font-medium text-foreground group-hover:text-accent-teal">
+          <div
+            className="px-2 pb-2 pt-1.5"
+            style={{ borderTop: `1px solid ${highlight ? "rgba(91,184,194,.22)" : "rgba(236,234,231,.1)"}` }}
+          >
+            <p
+              className={cn(
+                "truncate text-[11.5px] font-medium group-hover:text-accent-teal",
+                highlight ? "text-accent-teal" : "text-foreground",
+              )}
+            >
               {s.name}
             </p>
-            <p className="font-mono text-[0.6rem] text-text-dim">
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: "9px", color: "rgba(236,234,231,.42)" }}>
               {s.columnCount} col · {s.rowCount} lin
             </p>
           </div>
