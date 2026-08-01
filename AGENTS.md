@@ -105,8 +105,14 @@ com vão real entre elas e **paginação por medição** (`extensions/pagination
 + `planPages` no `WritingCanvas`) — nenhum parágrafo é cortado na virada, e a
 quebra de página explícita consome o resto da folha de verdade.
 
+Feito também: **biblioteca de referências** (aba própria `references` do projeto:
+qualquer tipo de fonte, PDF anexado em bucket privado, metadados importados de
+APIs públicas e gratuitas — Crossref/PubMed/arXiv/OpenLibrary/meta tags, **sem
+IA** — e formatação ABNT/APA/Vancouver em `lib/references/format.ts`).
+
 Falta (do brief): feed de atividade (pode vir do `audit_log`), status do
-projeto, biblioteca de **referências/citações** (inserção via "@" no editor),
+projeto, **citação da biblioteca dentro do projeto** (menção "@" no editor de
+Escrita usando `citation_key`, e vínculo de referência a casos/achados),
 histórico de versões do texto, bloco de ideias/kanban, **gráficos** (nenhuma lib
 instalada — o node `statChart` já prevê `statType: 'chart'` para quando existir),
 importação CSV/Excel, **campos customizáveis** das amostras e **achados**.
@@ -138,6 +144,15 @@ o que não é o shell nem ancestral dele (sidebar, topbar, abas do projeto) e, d
 do shell, tudo que não é `.folium-print` nem ancestral dele (chrome, régua, trilho,
 painéis, a pilha da tela com zoom/sombra/vão). Por isso **não se deve mexer nas
 alturas do clone** (inclusive espaçadores) no CSS de impressão — só no que é
-puramente visual (sombra da folha, vão, selo da quebra). As abas Referências e os
-itens apagados do trilho ficam desabilitados até a biblioteca de referências
-existir.
+puramente visual (sombra da folha, vão, selo da quebra). A aba Referências da
+faixa e o item do trilho **continuam desabilitados**, mas o motivo mudou: a
+biblioteca já existe (aba `references` do projeto) — falta ligar o editor a ela
+(inserir citação pelo `citation_key`, listar a bibliografia no documento).
+
+Os arquivos de referência usam o bucket **privado** `reference-files`
+(migration `20260801120000`), com o `project_id` como primeiro segmento do path
+— é dele que as policies do Storage tiram a permissão; o download sai por URL
+assinada no route handler `references/[referenceId]/file`. A busca de metadados
+roda no servidor com guarda anti-SSRF (`lib/references/safe-fetch.ts`): ela abre
+uma URL escolhida pelo usuário, então resolve o host por DNS e barra faixas
+privadas antes de conectar.

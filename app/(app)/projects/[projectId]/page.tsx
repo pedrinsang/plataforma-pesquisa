@@ -124,7 +124,12 @@ export default async function ProjectOverviewPage({
           Icon={BookMarked}
           kicker="Referências"
           value={`${refsTotal ?? 0}`}
-          note={`${refsEssential ?? 0} marcadas como essenciais`}
+          note={
+            refsTotal
+              ? `${refsEssential ?? 0} marcadas como essenciais`
+              : "abrir a biblioteca para adicionar"
+          }
+          href={`/projects/${projectId}/references`}
         />
         <StatCard
           Icon={ListChecks}

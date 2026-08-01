@@ -12,6 +12,18 @@ export type MilestoneStatus = "pending" | "in_progress" | "done";
 export type CaseStatus = "active" | "completed" | "archived";
 export type FieldEntity = "case" | "sample";
 export type FieldType = "text" | "textarea" | "number" | "date" | "select" | "boolean";
+export type ReferenceType =
+  | "article"
+  | "preprint"
+  | "book"
+  | "chapter"
+  | "thesis"
+  | "conference"
+  | "report"
+  | "website"
+  | "dataset"
+  | "software"
+  | "other";
 
 export interface Database {
   public: {
@@ -447,8 +459,31 @@ export interface Database {
           year: number | null;
           doi: string | null;
           is_essential: boolean;
+          ref_type: ReferenceType;
+          url: string | null;
+          container_title: string | null;
+          publisher: string | null;
+          volume: string | null;
+          issue: string | null;
+          pages: string | null;
+          edition: string | null;
+          abstract: string | null;
+          isbn: string | null;
+          issn: string | null;
+          pmid: string | null;
+          arxiv_id: string | null;
+          accessed_at: string | null;
+          citation_key: string | null;
+          csl: Json;
+          tags: string[];
+          notes: string | null;
+          file_path: string | null;
+          file_name: string | null;
+          file_size: number | null;
+          file_mime: string | null;
           created_by: string | null;
           created_at: string;
+          updated_at: string;
         };
         Insert: {
           id?: string;
@@ -458,6 +493,28 @@ export interface Database {
           year?: number | null;
           doi?: string | null;
           is_essential?: boolean;
+          ref_type?: ReferenceType;
+          url?: string | null;
+          container_title?: string | null;
+          publisher?: string | null;
+          volume?: string | null;
+          issue?: string | null;
+          pages?: string | null;
+          edition?: string | null;
+          abstract?: string | null;
+          isbn?: string | null;
+          issn?: string | null;
+          pmid?: string | null;
+          arxiv_id?: string | null;
+          accessed_at?: string | null;
+          citation_key?: string | null;
+          csl?: Json;
+          tags?: string[];
+          notes?: string | null;
+          file_path?: string | null;
+          file_name?: string | null;
+          file_size?: number | null;
+          file_mime?: string | null;
           created_by?: string | null;
         };
         Update: {
@@ -466,6 +523,28 @@ export interface Database {
           year?: number | null;
           doi?: string | null;
           is_essential?: boolean;
+          ref_type?: ReferenceType;
+          url?: string | null;
+          container_title?: string | null;
+          publisher?: string | null;
+          volume?: string | null;
+          issue?: string | null;
+          pages?: string | null;
+          edition?: string | null;
+          abstract?: string | null;
+          isbn?: string | null;
+          issn?: string | null;
+          pmid?: string | null;
+          arxiv_id?: string | null;
+          accessed_at?: string | null;
+          citation_key?: string | null;
+          csl?: Json;
+          tags?: string[];
+          notes?: string | null;
+          file_path?: string | null;
+          file_name?: string | null;
+          file_size?: number | null;
+          file_mime?: string | null;
         };
         Relationships: [
           {

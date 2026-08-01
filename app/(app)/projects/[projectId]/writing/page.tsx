@@ -1,4 +1,4 @@
-import { FileText, NotebookPen, BookOpen } from "lucide-react";
+import { FileText, NotebookPen } from "lucide-react";
 import { AreaCard } from "@/components/layout/AreaCard";
 
 export default async function WritingAreaPage({
@@ -11,9 +11,10 @@ export default async function WritingAreaPage({
   return (
     <div className="space-y-5">
       <p className="font-mono text-[0.7rem] uppercase tracking-[0.2em] text-accent-gold">
-        Escrita · do rascunho à bibliografia
+        Escrita · do rascunho ao texto final
       </p>
-      <div className="grid gap-4 sm:grid-cols-3">
+      {/* Referências saíram daqui: viraram aba própria do projeto. */}
+      <div className="grid gap-4 sm:grid-cols-2">
         <AreaCard
           href={`/projects/${projectId}/writing/documents`}
           icon={FileText}
@@ -26,13 +27,6 @@ export default async function WritingAreaPage({
           accent="amber"
           title="Notas"
           description="Ideias soltas organizadas em cards."
-          comingSoon
-        />
-        <AreaCard
-          icon={BookOpen}
-          accent="amber"
-          title="Referências"
-          description="Bibliografia em ABNT, APA, Vancouver e MDT."
           comingSoon
         />
       </div>
