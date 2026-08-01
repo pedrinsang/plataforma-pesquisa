@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, PenLine, LineChart, Settings2 } from "lucide-react";
+import { LayoutGrid, PenLine, LineChart, BookMarked, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 export function ProjectTabs({ projectId }: { projectId: string }) {
@@ -12,6 +12,7 @@ export function ProjectTabs({ projectId }: { projectId: string }) {
     { href: `/projects/${projectId}`, label: "Visão geral", exact: true, Icon: LayoutGrid },
     { href: `/projects/${projectId}/writing`, label: "Escrita", Icon: PenLine },
     { href: `/projects/${projectId}/statistics`, label: "Estatística", Icon: LineChart },
+    { href: `/projects/${projectId}/references`, label: "Referências", Icon: BookMarked },
     { href: `/projects/${projectId}/settings`, label: "Configurações", Icon: Settings2 },
   ];
 

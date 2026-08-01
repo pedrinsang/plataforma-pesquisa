@@ -77,11 +77,16 @@ planilha de dados (react-data-grid), dark/light, **segurança reforçada**
 (RLS por papel, rate limit de login, `audit_log`), **convites de participantes
 com aceite do convidado**, **redesign visual completo — sistema "Folium"**
 (editorial/petróleo, Cormorant + Lora, claro/escuro), **timeline/marcos**
-(linha do tempo com CRUD e reordenação) e **amostras/coleta** (CRUD em
-`statistics/samples`, alimenta o card e o gráfico semanal da visão geral).
+(linha do tempo com CRUD e reordenação), **amostras/coleta** (CRUD em
+`statistics/samples`, alimenta o card e o gráfico semanal da visão geral) e
+**biblioteca de referências** (aba própria `references`: qualquer tipo de fonte,
+PDF anexado em bucket privado, metadados importados de APIs públicas e
+gratuitas — Crossref/PubMed/arXiv/OpenLibrary/meta tags, **sem IA** — e
+formatação ABNT/APA/Vancouver em `lib/references/format.ts`).
 
 Falta (do brief): feed de atividade (pode vir do `audit_log`), status do
-projeto, biblioteca de **referências/citações** (inserção via "@" no editor),
+projeto, **citação da biblioteca dentro do projeto** (menção "@" no editor de
+Escrita usando `citation_key`, e vínculo de referência a casos/achados),
 histórico de versões do texto, bloco de ideias/kanban, **gráficos** (nenhuma lib
 instalada — o node `statChart` já prevê `statType: 'chart'` para quando existir),
 importação CSV/Excel, **campos customizáveis** das amostras e **achados**.
@@ -89,4 +94,9 @@ importação CSV/Excel, **campos customizáveis** das amostras e **achados**.
 Notas: o editor já tem link e imagem — quando o conteúdo for renderizado fora do
 TipTap (export/print), avaliar sanitização XSS do HTML. Upload de imagem usa o
 bucket `writing-images` (migration `20260727120000`; rodar `npx supabase db push`).
+Os arquivos de referência usam o bucket **privado** `reference-files`
+(migration `20260801120000`), com o `project_id` como primeiro segmento do path
+— é dele que as policies do Storage tiram a permissão; o download sai por URL
+assinada no route handler `references/[referenceId]/file`. A busca de metadados
+roda no servidor com guarda anti-SSRF (`lib/references/safe-fetch.ts`).
 Convites não enviam e-mail (vinculam por `invited_email` no cadastro).
