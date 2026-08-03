@@ -6,8 +6,15 @@ import { DocumentTopBar } from "@/components/writing/DocumentTopBar";
 import { RibbonTabs, type RibbonTab } from "@/components/writing/RibbonTabs";
 import { Ribbon } from "@/components/writing/ribbon/Ribbon";
 import { OutlinePanel } from "@/components/writing/OutlinePanel";
-import { SideRail, type RailPanel } from "@/components/writing/SideRail";
+import {
+  SideRail,
+  type LeftPanel,
+  type RailPanel,
+  type RightPanel,
+} from "@/components/writing/SideRail";
 import { StatPanel } from "@/components/writing/StatPanel";
+import { ReferencesPanel } from "@/components/writing/ReferencesPanel";
+import { ArticleReader } from "@/components/writing/ArticleReader";
 import { WritingCanvas } from "@/components/writing/WritingCanvas";
 import { RulerBand } from "@/components/writing/WritingRuler";
 import { WritingStatusBar } from "@/components/writing/WritingStatusBar";
@@ -15,6 +22,7 @@ import { SearchReplacePanel } from "@/components/writing/SearchReplacePanel";
 import { buildEditorExtensions } from "@/lib/writing/editor-extensions";
 import { ZOOM_DEFAULT } from "@/lib/writing/page-metrics";
 import type { StatSourceKind } from "@/lib/writing/stat-sources";
+import type { OpenArticle } from "@/lib/writing/reference-sources";
 import {
   updateDocumentContent,
   updateDocumentTitle,
@@ -28,12 +36,16 @@ function countWords(text: string) {
   return trimmed === "" ? 0 : trimmed.split(/\s+/).length;
 }
 
+/** Largura inicial do leitor de artigos (px) — metade "de leitura" da tela. */
+const READER_WIDTH_DEFAULT = 520;
+
 /**
  * Editor de Escrita em tela cheia (design "Escrita — Editor em tela cheia"):
  * três linhas de chrome no topo (documento · abas da faixa · faixa agrupada),
- * régua, folha centralizada, trilho de painéis à direita e barra de status.
- * O shell é uma ilha de tinta (`.folium-shell`) — escuro nos dois temas do app,
- * com a folha branca no centro.
+ * régua, folha centralizada, **dois trilhos de painéis** (instrumentos à
+ * direita, navegação do texto à esquerda) e barra de status. O shell é uma ilha
+ * de tinta (`.folium-shell`) — escuro nos dois temas do app, com a folha branca
+ * no centro.
  */
 export function DocumentEditor({
   documentId,
@@ -68,7 +80,13 @@ export function DocumentEditor({
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving">("saved");
   const [tab, setTab] = useState<RibbonTab>("Início");
   const [ribbonCollapsed, setRibbonCollapsed] = useState(false);
-  const [panel, setPanel] = useState<RailPanel | null>(null);
+  // Um painel por trilho: dá para consultar o sumário e a biblioteca ao mesmo
+  // tempo, um de cada lado da folha.
+  const [rightPanel, setRightPanel] = useState<RightPanel | null>(null);
+  const [leftPanel, setLeftPanel] = useState<LeftPanel | null>(null);
+  const [articles, setArticles] = useState<OpenArticle[]>([]);
+  const [activeArticle, setActiveArticle] = useState<string | null>(null);
+  const [readerWidth, setReaderWidth] = useState(READER_WIDTH_DEFAULT);
   const [linkOpenSignal, setLinkOpenSignal] = useState(0);
   const [search, setSearch] = useState<{ open: boolean; replace: boolean }>({
     open: false,
@@ -184,7 +202,37 @@ export function DocumentEditor({
 
   function handleInsertStat(statId: string, kind: StatSourceKind) {
     editor?.chain().focus().insertStatChart({ statId, statType: kind }).run();
-    setPanel(null);
+    setRightPanel(null);
+  }
+
+  /** Alterna o painel do trilho, mantendo os dois lados independentes. */
+  function toggleRail(panel: RailPanel) {
+    if (panel === "outline" || panel === "notes" || panel === "versions") {
+      setLeftPanel((prev) => (prev === panel ? null : panel));
+    } else {
+      setRightPanel((prev) => (prev === panel ? null : panel));
+    }
+  }
+
+  /**
+   * Abrir um artigo da biblioteca não sai do editor: o item entra na lista do
+   * painel "Artigos" (logo abaixo de Referências no trilho) e a página se divide
+   * em duas — texto de um lado, artigo do outro.
+   */
+  function handleOpenArticle(article: OpenArticle) {
+    setArticles((prev) => (prev.some((a) => a.id === article.id) ? prev : [...prev, article]));
+    setActiveArticle(article.id);
+    setRightPanel("articles");
+  }
+
+  function handleCloseArticle(id: string) {
+    const next = articles.filter((a) => a.id !== id);
+    setArticles(next);
+    if (activeArticle === id) setActiveArticle(next.at(-1)?.id ?? null);
+  }
+
+  function handleCite(text: string) {
+    editor?.chain().focus().insertContent(text).run();
   }
 
   return (
@@ -219,7 +267,8 @@ export function DocumentEditor({
           tab={tab}
           projectId={projectId}
           linkOpenSignal={linkOpenSignal}
-          onInsertStat={() => setPanel("stats")}
+          onInsertStat={() => setRightPanel("stats")}
+          onOpenReferences={() => setRightPanel("references")}
           onFind={() => setSearch({ open: true, replace: false })}
           onReplace={() => setSearch({ open: true, replace: true })}
           showRuler={showRuler}
@@ -238,6 +287,11 @@ export function DocumentEditor({
       )}
 
       <div className="relative flex min-h-0 flex-1">
+        <SideRail side="left" open={leftPanel} onToggle={toggleRail} />
+        {leftPanel === "outline" && editor && (
+          <OutlinePanel editor={editor} onClose={() => setLeftPanel(null)} />
+        )}
+
         <div className="flex min-w-0 flex-1 flex-col">
           {showRuler && editor && (
             <RulerBand
@@ -258,20 +312,40 @@ export function DocumentEditor({
           />
         </div>
 
-        {panel === "stats" && (
+        {rightPanel === "stats" && (
           <StatPanel
             projectId={projectId}
-            onClose={() => setPanel(null)}
+            onClose={() => setRightPanel(null)}
             onInsert={handleInsertStat}
           />
         )}
-        {panel === "outline" && editor && (
-          <OutlinePanel editor={editor} onClose={() => setPanel(null)} />
+        {rightPanel === "references" && (
+          <ReferencesPanel
+            projectId={projectId}
+            onClose={() => setRightPanel(null)}
+            onOpenArticle={handleOpenArticle}
+            onCite={handleCite}
+            openArticleIds={articles.map((a) => a.id)}
+          />
+        )}
+        {rightPanel === "articles" && (
+          <ArticleReader
+            articles={articles}
+            activeId={activeArticle}
+            width={readerWidth}
+            onWidthChange={setReaderWidth}
+            onSelect={setActiveArticle}
+            onCloseArticle={handleCloseArticle}
+            onClose={() => setRightPanel(null)}
+            onOpenLibrary={() => setRightPanel("references")}
+          />
         )}
 
         <SideRail
-          open={panel}
-          onToggle={(next) => setPanel((prev) => (prev === next ? null : next))}
+          side="right"
+          open={rightPanel}
+          onToggle={toggleRail}
+          articleCount={articles.length}
         />
 
         {editor && (

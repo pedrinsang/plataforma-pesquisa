@@ -89,6 +89,8 @@ export type RibbonProps = {
   /** Sinal do Ctrl+K para abrir o popover de link. */
   linkOpenSignal?: number;
   onInsertStat: () => void;
+  /** Abre a biblioteca de referências no trilho da direita. */
+  onOpenReferences: () => void;
   onFind: () => void;
   onReplace: () => void;
   showRuler: boolean;
@@ -594,7 +596,12 @@ export function Ribbon(props: RibbonProps) {
       {tab === "Referências" && (
         <RibbonGroup label="Biblioteca" gap={4}>
           <RibbonBigButton label="Nova" title="Nova referência — em breve" icon={<Library size={19} />} onClick={() => {}} disabled />
-          <RibbonBigButton label="Citar" title="Inserir citação — em breve" icon={<BookMarked size={19} />} onClick={() => {}} disabled />
+          <RibbonBigButton
+            label="Citar"
+            title="Abrir a biblioteca do projeto para citar ou ler um artigo"
+            icon={<BookMarked size={19} />}
+            onClick={props.onOpenReferences}
+          />
           <RibbonBigButton
             label="Bibliografia"
             title="Gerar bibliografia — em breve"
@@ -602,7 +609,7 @@ export function Ribbon(props: RibbonProps) {
             onClick={() => {}}
             disabled
           />
-          <RibbonReadout>referências e citações chegam em breve</RibbonReadout>
+          <RibbonReadout>a lista completa fica na aba Referências do projeto</RibbonReadout>
         </RibbonGroup>
       )}
     </div>

@@ -95,15 +95,22 @@ render no overlay do `WritingCanvas`). O editor de um documento agora é uma
 `.folium-shell` (`fixed inset-0`) com três linhas de chrome — barra do documento
 (46 px), abas da faixa (34 px: Início · Inserir · Layout · Revisão · Referências)
 e faixa agrupada (78 px, grupos com rótulo em versalete) —, faixa da régua
-(24 px, fora da rolagem), folha centralizada, **trilho de painéis** à direita
-(44 px: Estatísticas e Sumário funcionam; Referências/Artigos/Notas/Versões ficam
-apagados "em breve") e barra de status (28 px: página atual, contagens, meta e
-zoom). Arquivos: `DocumentTopBar`, `RibbonTabs`, `ribbon/*`, `SideRail`,
+(24 px, fora da rolagem), folha centralizada, **dois trilhos de painéis** (44 px
+cada) e barra de status (28 px: página atual, contagens, meta e zoom). Os seis
+instrumentos ficavam num trilho só, à direita, e os rótulos verticais não cabiam
+na altura de um notebook — a lista era cortada. Agora à **direita** ficam os
+instrumentos que vêm de fora do texto (Estatísticas · Referências · Artigos) e à
+**esquerda** a navegação do próprio texto (Sumário · Notas · Versões); cada
+trilho tem seu painel, então dá para ler o sumário e a biblioteca ao mesmo tempo.
+Notas e Versões continuam apagados "em breve". Arquivos: `DocumentTopBar`,
+`RibbonTabs`, `ribbon/*`, `SideRail`, `ReferencesPanel`, `ArticleReader`,
 `WritingStatusBar`, `WritingCanvas`, `WritingRuler` (`RulerBand`), `ui.tsx`.
 A folha deixou de ser contínua: agora é uma **pilha de páginas A4 separadas**
 com vão real entre elas e **paginação por medição** (`extensions/pagination.ts`
-+ `planPages` no `WritingCanvas`) — nenhum parágrafo é cortado na virada, e a
-quebra de página explícita consome o resto da folha de verdade.
++ `planPages` no `WritingCanvas`), e a quebra de página explícita consome o
+resto da folha de verdade. A paginação é **por linha, não por bloco**: um
+parágrafo longo é **repartido entre duas folhas** como num processador de texto,
+com controle de viúvas e órfãs (`MIN_LINES = 2`).
 
 Feito também: **biblioteca de referências** (aba própria `references` do projeto:
 qualquer tipo de fonte, PDF anexado em bucket privado, metadados importados de
@@ -124,14 +131,26 @@ Cabeçalho/rodapé precisam da migration `20260728120000_document_header_footer`
 (colunas `header_text`/`footer_text` em `documents`) — **rodar `npx supabase db
 push`**; até lá a busca é tolerante (campos vazios, editor não quebra).
 A paginação é **medida no cliente** (não é do ProseMirror): `WritingCanvas` lê a
-geometria dos blocos de primeiro nível e manda espaçadores para a extensão
-`foliumPagination`, que os desenha como widget decorations. Duas coisas seguram
-isso de pé e não devem ser desfeitas: `.folium-editor` é `display:flex;
-flex-direction:column` (em contexto flex as margens **não colapsam**, senão
-inserir/remover espaçador muda o espaço entre parágrafos e a medição oscila) e o
-agendamento usa `setTimeout`, não `requestAnimationFrame` (rAF não roda em aba
-oculta). Um bloco mais alto que uma folha (tabela/imagem grande) ainda atravessa
-a virada — o `.folium-seam` mascara o vão. Convites não enviam e-mail (vinculam
+geometria e manda espaçadores para a extensão `foliumPagination`, que os desenha
+como widget decorations. São **dois tipos** de espaçador (`PageSpacer.inline`):
+um `div` entre blocos, que desce o bloco inteiro, e um `span` da largura da
+coluna **dentro** do parágrafo (`.folium-line-spacer`), que reparte o parágrafo
+sem que ele deixe de ser um único nó do documento. Por isso a medição desce ao
+nível da linha: `readLines` monta as caixas de linha com `Range.getClientRects()`
+e ancora a virada com `view.posAtCoords`. Três coisas seguram isso de pé e não
+devem ser desfeitas: `.folium-editor` é `display:flex; flex-direction:column`
+(em contexto flex as margens **não colapsam**, senão inserir/remover espaçador
+muda o espaço entre parágrafos e a medição oscila); o agendamento usa
+`setTimeout`, não `requestAnimationFrame` (rAF não roda em aba oculta); e os
+retângulos de linha vêm **com o zoom aplicado**, então todo delta é dividido por
+`zoom` antes de virar coordenada natural (os `offsetTop`/`offsetHeight` dos
+blocos, não — transform não os afeta). As linhas são agrupadas em faixas pelo
+**ponto médio** do retângulo, não por sobreposição: com entrelinha apertada
+(Cormorant nos títulos) as caixas de linhas vizinhas se sobrepõem, e agrupar por
+sobreposição fundiria o bloco inteiro numa faixa só — sem ponto de virada, sem
+quebra. Título e bloco de código só partem quando são mais altos que a folha
+(`SPLITTABLE_IF_TALL`); tabela/imagem/gráfico não partem e, se forem mais altos
+que uma folha, ainda atravessam a virada — o `.folium-seam` mascara o vão. Convites não enviam e-mail (vinculam
 por `invited_email` no cadastro). No editor em tela cheia, "Baixar PDF" e
 "Imprimir" são o mesmo `window.print()`, e o papel sai **igual à tela**: no
 `beforeprint` o `WritingCanvas` monta a **via de impressão** (`.folium-print`) —
@@ -144,10 +163,27 @@ o que não é o shell nem ancestral dele (sidebar, topbar, abas do projeto) e, d
 do shell, tudo que não é `.folium-print` nem ancestral dele (chrome, régua, trilho,
 painéis, a pilha da tela com zoom/sombra/vão). Por isso **não se deve mexer nas
 alturas do clone** (inclusive espaçadores) no CSS de impressão — só no que é
-puramente visual (sombra da folha, vão, selo da quebra). A aba Referências da
-faixa e o item do trilho **continuam desabilitados**, mas o motivo mudou: a
-biblioteca já existe (aba `references` do projeto) — falta ligar o editor a ela
-(inserir citação pelo `citation_key`, listar a bibliografia no documento).
+puramente visual (sombra da folha, vão, selo da quebra).
+
+O editor já **enxerga a biblioteca**: o painel Referências do trilho da direita
+(`ReferencesPanel`, leitura pelo cliente em `lib/writing/reference-sources.ts`)
+lista as referências do projeto, insere a citação no corpo do texto (ABNT/APA/
+Vancouver, texto simples — ainda **não** é um nó de citação vinculado ao
+`citation_key`) e abre o artigo **sem sair do editor**: o item vai para o painel
+"Artigos" (`ArticleReader`), que divide a página em duas — texto à esquerda,
+artigo à direita, com divisória arrastável e abas dos artigos abertos. O PDF
+anexado entra pelo route handler de URL assinada (sempre embute); link/DOI
+externo entra em `sandbox` e pode ser recusado pelo site (X-Frame-Options) — por
+isso o recado de "abrir em nova aba" fica desenhado **por baixo** do iframe, que
+é transparente de propósito. Falta ainda: nó de citação vinculado e bibliografia
+gerada no documento ("Nova" e "Bibliografia" na faixa seguem desabilitados).
+
+O espaçamento entre parágrafos é definido em `.folium-editor > *`
+(8 pt embaixo, 0 em cima; 12 pt antes dos títulos) e **não pode voltar para o
+`prose`**: como o editor é `display:flex`, as margens não colapsam e as margens
+do typography somavam dos dois lados — ~48 px de vão a cada Enter. A regra
+`.folium-editor > .folium-page-spacer { margin: 0 }` tem de continuar existindo,
+senão a medição da paginação oscila.
 
 Os arquivos de referência usam o bucket **privado** `reference-files`
 (migration `20260801120000`), com o `project_id` como primeiro segmento do path

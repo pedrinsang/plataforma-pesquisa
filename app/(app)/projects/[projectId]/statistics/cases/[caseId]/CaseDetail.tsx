@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { ArrowLeft, Pencil, Plus, Beaker, Trash2 } from "lucide-react";
-import { CustomValuesList, type CustomValues } from "../../../CustomFields";
+import { CustomValuesList } from "../../../CustomFields";
 import type { FieldDef } from "../../../CustomFieldsManager";
 import { CaseModal, STATUS_META, type CaseRow } from "../CaseModal";
 import { SampleModal, fmtDate, type Sample } from "../../samples/SampleModal";

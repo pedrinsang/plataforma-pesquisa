@@ -68,15 +68,20 @@ function findMatches(
   }
 
   // Agrupa nós de texto irmãos num único trecho, preservando a posição inicial.
+  // O trecho corrente é acumulado por referência e fechado no primeiro nó que
+  // não é texto — indexar por um contador deixaria buracos no array (todo bloco
+  // sem texto pula um índice) e `for..of` os percorre como `undefined`.
   const runs: Array<{ text: string; pos: number }> = [];
-  let index = 0;
+  let run: { text: string; pos: number } | null = null;
   doc.descendants((node, pos) => {
     if (node.isText) {
-      const run = runs[index];
       if (run) run.text += node.text ?? "";
-      else runs[index] = { text: node.text ?? "", pos };
+      else {
+        run = { text: node.text ?? "", pos };
+        runs.push(run);
+      }
     } else {
-      index += 1;
+      run = null;
     }
   });
 

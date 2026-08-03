@@ -20,7 +20,43 @@ import type { PageSpacer } from "@/lib/writing/extensions/pagination";
 /** Tolerância de medição (subpixel) antes de considerar que um bloco transbordou. */
 const EPS = 0.5;
 
-type Entry = { pos: number; isBreak: boolean; naturalTop: number; height: number };
+/**
+ * Mínimo de linhas de um mesmo parágrafo que ficam juntas de cada lado da
+ * virada — controle de viúvas e órfãs, como num processador de texto. Quando não
+ * dá para respeitar dos dois lados, o parágrafo inteiro desce.
+ */
+const MIN_LINES = 2;
+
+/**
+ * Blocos que podem ser repartidos entre duas folhas. Título não parte (fica com
+ * o texto que ele abre), e tabela/imagem/quebra/gráfico não têm linhas de texto
+ * para repartir — esses continuam descendo inteiros.
+ */
+const SPLITTABLE = new Set(["paragraph", "bulletList", "orderedList", "blockquote"]);
+
+/**
+ * Blocos que só partem quando não cabem numa folha inteira. Um título fica com o
+ * texto que ele abre (por isso não parte à toa), mas um título absurdamente
+ * longo precisa partir — a alternativa é atravessar a virada por cima do vão.
+ */
+const SPLITTABLE_IF_TALL = new Set(["heading", "codeBlock"]);
+
+/** Uma linha visual de um bloco, em coordenadas naturais do fluxo. */
+type Line = {
+  /** Posição no doc onde a linha começa, ou -1 quando não dá para ancorar ali. */
+  pos: number;
+  top: number;
+  bottom: number;
+};
+
+type Entry = {
+  pos: number;
+  isBreak: boolean;
+  naturalTop: number;
+  height: number;
+  /** Linhas do bloco; `null` quando ele não pode ser repartido. */
+  lines: Line[] | null;
+};
 
 /**
  * Lê a geometria real do documento e devolve os blocos de primeiro nível com a
@@ -28,15 +64,21 @@ type Entry = { pos: number; isBreak: boolean; naturalTop: number; height: number
  * aplicados). O pareamento é por índice: cada nó de primeiro nível corresponde a
  * um filho do DOM do ProseMirror, na mesma ordem.
  */
-function readEntries(editor: Editor): Entry[] | null {
+function readEntries(editor: Editor, zoom: number): Entry[] | null {
   const root = editor.view.dom as HTMLElement;
   const positions: number[] = [];
+  const ends: number[] = [];
   const isBreak: boolean[] = [];
+  const splittable: boolean[] = [];
+  const tallOnly: boolean[] = [];
   let pos = 0;
   editor.state.doc.forEach((node) => {
     positions.push(pos);
-    isBreak.push(node.type.name === "pageBreak");
     pos += node.nodeSize;
+    ends.push(pos);
+    isBreak.push(node.type.name === "pageBreak");
+    splittable.push(SPLITTABLE.has(node.type.name));
+    tallOnly.push(SPLITTABLE_IF_TALL.has(node.type.name));
   });
 
   const entries: Entry[] = [];
@@ -51,15 +93,103 @@ function readEntries(editor: Editor): Entry[] | null {
     // senão o pareamento por índice sai do lugar enquanto ele está visível.
     if (child.classList.contains("ProseMirror-gapcursor")) continue;
     if (index >= positions.length) return null; // DOM e doc dessincronizados
+    // Os espaçadores de linha ficam *dentro* do bloco: saem da altura natural
+    // dele e entram no acumulado só depois, para não deslocar o próprio bloco.
+    const inner = innerSpacerHeight(child);
+    const naturalTop = child.offsetTop - spacerAcc;
+    const height = child.offsetHeight - inner;
+    const canSplit =
+      splittable[index] || (tallOnly[index] && height > CONTENT_HEIGHT_PX + EPS);
     entries.push({
       pos: positions[index],
       isBreak: isBreak[index],
-      naturalTop: child.offsetTop - spacerAcc,
-      height: child.offsetHeight,
+      naturalTop,
+      height,
+      lines: canSplit
+        ? readLines(editor, child, naturalTop, zoom, positions[index], ends[index])
+        : null,
     });
+    spacerAcc += inner;
     index += 1;
   }
   return index === positions.length ? entries : null;
+}
+
+/** Soma dos espaçadores de virada que já estão dentro deste bloco. */
+function innerSpacerHeight(block: HTMLElement): number {
+  let total = 0;
+  block.querySelectorAll<HTMLElement>(".folium-line-spacer").forEach((el) => {
+    total += el.offsetHeight;
+  });
+  return total;
+}
+
+/**
+ * Mede as linhas visuais de um bloco. `getClientRects` de um `Range` sobre o
+ * conteúdo devolve um retângulo por caixa de linha (vários por linha quando há
+ * marcas), então os retângulos são agrupados em faixas por sobreposição vertical.
+ *
+ * Estes retângulos vêm em coordenadas de tela, **com o zoom aplicado** — por
+ * isso todo delta é dividido por `zoom` antes de virar coordenada natural. As
+ * faixas que correspondem a um espaçador já aplicado são descontadas, do mesmo
+ * jeito que os espaçadores de bloco.
+ */
+function readLines(
+  editor: Editor,
+  block: HTMLElement,
+  naturalTop: number,
+  zoom: number,
+  from: number,
+  to: number,
+): Line[] | null {
+  const range = document.createRange();
+  range.selectNodeContents(block);
+  const rects = Array.from(range.getClientRects()).filter((r) => r.height > 0);
+  if (rects.length === 0) return null;
+
+  const blockTop = block.getBoundingClientRect().top;
+  const spacerRects = Array.from(
+    block.querySelectorAll<HTMLElement>(".folium-line-spacer"),
+  ).map((el) => el.getBoundingClientRect());
+
+  // Um retângulo entra na faixa corrente quando o **meio** dele cai dentro dela.
+  // Testar só a sobreposição não serve: com entrelinha apertada (os títulos em
+  // Cormorant, por exemplo) as caixas de linhas vizinhas se sobrepõem, e o bloco
+  // inteiro viraria uma faixa só — nenhum ponto de virada, nenhuma quebra.
+  // Pelo meio, sobrescrito e corpo continuam na mesma linha e linhas vizinhas
+  // continuam separadas.
+  const bands: Array<{ top: number; bottom: number; left: number }> = [];
+  for (const r of rects) {
+    const last = bands[bands.length - 1];
+    const middle = r.top + r.height / 2;
+    if (last && middle > last.top && middle < last.bottom) {
+      last.top = Math.min(last.top, r.top);
+      last.bottom = Math.max(last.bottom, r.bottom);
+      last.left = Math.min(last.left, r.left);
+    } else {
+      bands.push({ top: r.top, bottom: r.bottom, left: r.left });
+    }
+  }
+
+  const lines: Line[] = [];
+  let innerAcc = 0;
+  for (const band of bands) {
+    const height = band.bottom - band.top;
+    const spacer = spacerRects.find(
+      (s) => Math.abs(s.top - band.top) < 1 && Math.abs(s.height - height) < 1,
+    );
+    if (spacer) {
+      innerAcc += spacer.height / zoom;
+      continue;
+    }
+    const top = naturalTop + (band.top - blockTop) / zoom - innerAcc;
+    // Onde a linha começa no documento. Sem isso não dá para ancorar o vão, e a
+    // linha deixa de ser um ponto de virada válido (fica com `pos: -1`).
+    const hit = editor.view.posAtCoords({ left: band.left + 1, top: band.top + height / 2 });
+    const at = hit && hit.pos > from && hit.pos < to ? hit.pos : -1;
+    lines.push({ pos: at, top, bottom: top + height / zoom });
+  }
+  return lines.length > 0 ? lines : null;
 }
 
 /**
@@ -73,38 +203,121 @@ function readEntries(editor: Editor): Entry[] | null {
  */
 function planPages(entries: Entry[]): { spacers: PageSpacer[]; pageCount: number } {
   const spacers: PageSpacer[] = [];
-  let y = 0;
+  // Vão total já reservado acima do ponto que está sendo examinado. A posição
+  // real de qualquer coisa é sempre `natural + offset`, então não é preciso
+  // caminhar de bloco em bloco somando alturas.
+  let offset = 0;
   let bottom = 0;
   let forceNextPage = false;
 
-  entries.forEach((entry, i) => {
-    const advance =
-      i + 1 < entries.length ? entries[i + 1].naturalTop - entry.naturalTop : entry.height;
-    const page = pageOfFlowY(y);
+  for (const entry of entries) {
+    let top = entry.naturalTop + offset;
     const fitsInOnePage = entry.height <= CONTENT_HEIGHT_PX + EPS;
-    const overflows = y + entry.height > pageContentBottom(page) + EPS;
+    const overflows = (at: number) =>
+      at + entry.height > pageContentBottom(pageOfFlowY(at)) + EPS;
 
-    if (forceNextPage || (fitsInOnePage && overflows)) {
-      const push = sheetTop(page + 1) - y;
+    if (forceNextPage) {
+      const push = sheetTop(pageOfFlowY(top) + 1) - top;
       if (push > EPS) {
         spacers.push({ pos: entry.pos, height: push });
-        y += push;
+        offset += push;
+        top += push;
       }
       forceNextPage = false;
     }
 
-    bottom = Math.max(bottom, y + entry.height);
+    if (overflows(top)) {
+      if (entry.lines && entry.lines.length > 1) {
+        offset += splitEntry(entry, offset, spacers);
+      } else if (fitsInOnePage) {
+        const push = sheetTop(pageOfFlowY(top) + 1) - top;
+        if (push > EPS) {
+          spacers.push({ pos: entry.pos, height: push });
+          offset += push;
+        }
+      }
+      // Bloco mais alto que uma folha e sem linhas para repartir (tabela ou
+      // imagem grande) segue atravessando: não há para onde empurrar.
+    }
+
+    bottom = Math.max(bottom, entry.naturalTop + offset + entry.height);
     if (entry.isBreak) forceNextPage = true;
-    y += Math.max(advance, 0);
-  });
+  }
 
   const lastPage = pageOfFlowY(Math.max(bottom - EPS, 0));
   return { spacers, pageCount: Math.max(1, lastPage + 1) + (forceNextPage ? 1 : 0) };
 }
 
+/**
+ * Reparte um bloco entre folhas. Percorre as linhas e, na primeira que cruzaria
+ * o fim da área de texto, reserva o vão que falta para ela recomeçar no topo da
+ * folha seguinte — o parágrafo continua sendo um só nó do documento, o vão é
+ * apenas um espaçador em linha desenhado no meio dele.
+ *
+ * Viúvas e órfãs movem o ponto de virada para cima; quando nem assim dá para
+ * deixar `MIN_LINES` dos dois lados, o bloco inteiro desce. Devolve o vão somado.
+ */
+function splitEntry(entry: Entry, offsetIn: number, spacers: PageSpacer[]): number {
+  const lines = entry.lines;
+  if (!lines) return 0;
+
+  let offset = offsetIn;
+  let segStart = 0; // primeira linha da folha corrente
+  let i = 0;
+  // O laço só avança ou reserva vão, mas a medição é subpixel — a trava evita
+  // que um arredondamento infeliz prenda a paginação num laço infinito.
+  let guard = lines.length * 4 + 8;
+
+  while (i < lines.length && guard > 0) {
+    guard -= 1;
+    const line = lines[i];
+    if (line.bottom + offset <= pageContentBottom(pageOfFlowY(line.top + offset)) + EPS) {
+      i += 1;
+      continue;
+    }
+
+    let at = i;
+    // Viúva: pelo menos MIN_LINES descem junto.
+    if (lines.length - at < MIN_LINES) at = lines.length - MIN_LINES;
+    // Órfã: pelo menos MIN_LINES ficam na folha que termina. Se já houve uma
+    // virada logo acima, não dá para subir mais — parte no ponto original.
+    if (at - segStart < MIN_LINES) at = segStart === 0 ? 0 : i;
+    if (at <= segStart && segStart > 0) at = i;
+
+    if (at <= 0 || lines[at].pos < 0) {
+      // Sem ponto de virada utilizável dentro do bloco: desce ele inteiro.
+      const blockTop = entry.naturalTop + offset;
+      const push = sheetTop(pageOfFlowY(blockTop) + 1) - blockTop;
+      if (push <= EPS) break;
+      spacers.push({ pos: entry.pos, height: push });
+      offset += push;
+      i = 0;
+      segStart = 0;
+      continue;
+    }
+
+    const lineTop = lines[at].top + offset;
+    const push = sheetTop(pageOfFlowY(lineTop) + 1) - lineTop;
+    if (push <= EPS) {
+      i += 1;
+      continue;
+    }
+    spacers.push({ pos: lines[at].pos, height: push, inline: true });
+    offset += push;
+    segStart = at;
+    i = at + 1;
+  }
+  return offset - offsetIn;
+}
+
 function sameSpacers(a: PageSpacer[], b: PageSpacer[]): boolean {
   if (a.length !== b.length) return false;
-  return a.every((s, i) => s.pos === b[i].pos && Math.abs(s.height - b[i].height) < EPS);
+  return a.every(
+    (s, i) =>
+      s.pos === b[i].pos &&
+      Boolean(s.inline) === Boolean(b[i].inline) &&
+      Math.abs(s.height - b[i].height) < EPS,
+  );
 }
 
 /** Enfeites de edição que não existem no papel (cursor, alças, realces). */
@@ -176,7 +389,7 @@ export function WritingCanvas({
   // ── paginação: mede, planeja e aplica os espaçadores ─────────────────────
   const paginate = useCallback(() => {
     if (!editor || editor.isDestroyed) return;
-    const entries = readEntries(editor);
+    const entries = readEntries(editor, zoom);
     if (!entries) return;
     const { spacers, pageCount: next } = planPages(entries);
     setPageCount((prev) => (prev === next ? prev : next));
@@ -184,7 +397,7 @@ export function WritingCanvas({
       appliedRef.current = spacers;
       editor.commands.setPageSpacers(spacers);
     }
-  }, [editor]);
+  }, [editor, zoom]);
 
   // Agenda com timer (e não `requestAnimationFrame`): rAF não roda em aba de
   // segundo plano, e a paginação precisa ficar correta mesmo quando o documento

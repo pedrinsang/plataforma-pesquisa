@@ -519,6 +519,30 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* imagens não devem esticar na transversal do flex — mantêm o tamanho e centram */
 .folium-editor > img { align-self: center; }
 
+/* Espaçamento entre blocos — o vão que aparece ao apertar Enter.
+   Consequência do flex acima: as margens **não colapsam**, então as margens
+   generosas do `prose` (1,33em em cima *e* embaixo) somavam duas vezes entre dois
+   parágrafos (~48 px). Aqui o espaçamento passa a ser responsabilidade de um lado
+   só (embaixo) e na escala de um processador de texto: 8 pt depois do parágrafo,
+   como o padrão do Word. Em `pt` de propósito — é medida de papel e não muda
+   quando o usuário troca o tamanho da fonte.
+   O estilo inline do `foliumParagraphSpacing` continua vencendo, por ser inline. */
+.folium-editor > * { margin-top: 0; margin-bottom: 8pt; }
+.folium-editor > :first-child { margin-top: 0; }
+.folium-editor > h1,
+.folium-editor > h2 { margin-top: 12pt; margin-bottom: 4pt; }
+.folium-editor > h3,
+.folium-editor > h4 { margin-top: 10pt; margin-bottom: 3pt; }
+.folium-editor > ul,
+.folium-editor > ol,
+.folium-editor > blockquote,
+.folium-editor > pre,
+.folium-editor > hr,
+.folium-editor > img,
+.folium-editor > .tableWrapper { margin-top: 4pt; margin-bottom: 8pt; }
+/* o espaçador da paginação é vão puro: margem nenhuma, senão a medição oscila */
+.folium-editor > .folium-page-spacer { margin: 0; }
+
 /* ── chrome do editor em tela cheia ────────────────────────────────────
    Três linhas no topo (documento · abas da faixa · faixa agrupada), régua,
    folha centralizada, trilho de painéis à direita e barra de status embaixo.
@@ -767,7 +791,11 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* marca de cor abaixo do glifo (cor do texto / destaque) */
 .fx-swatch { display: block; width: 17px; height: 3px; border-radius: 1px; }
 
-/* trilho de painéis (direita) */
+/* trilhos de painéis — um de cada lado da folha. Os seis instrumentos não cabem
+   numa coluna só em tela de notebook (os rótulos são verticais), então a lista
+   foi partida: instrumentos externos à direita, navegação do texto à esquerda.
+   O `overflow` é rede de segurança para telas ainda mais baixas: o trilho rola
+   em vez de ser cortado. */
 .fx-rail {
   display: flex;
   flex-direction: column;
@@ -778,6 +806,14 @@ textarea.input { min-height: 90px; resize: vertical; }
   padding: 8px 0;
   background: var(--fx-rail);
   border-left: 1px solid rgba(236, 234, 231, 0.12);
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.fx-rail::-webkit-scrollbar { display: none; }
+.fx-rail-side-left {
+  border-left: 0;
+  border-right: 1px solid rgba(236, 234, 231, 0.12);
 }
 .fx-rail-item {
   position: relative;
@@ -822,16 +858,23 @@ textarea.input { min-height: 90px; resize: vertical; }
 }
 .fx-rail-sep { width: 20px; height: 1px; flex: none; background: rgba(236, 234, 231, 0.18); margin: 7px 0; }
 
-/* painel encaixado (Estatísticas, Sumário) */
+/* painel encaixado (Estatísticas, Referências, Sumário). A largura do design é
+   392 px, mas ela cede em telas estreitas para a folha não sumir. */
 .fx-panel {
   display: flex;
   flex-direction: column;
-  width: 392px;
+  width: clamp(248px, 27vw, 392px);
   flex: none;
   min-height: 0;
   background: var(--fx-rail);
   border-left: 1px solid rgba(91, 184, 194, 0.28);
   box-shadow: -22px 0 48px -16px rgba(0, 0, 0, 0.85);
+}
+/* espelho do painel quando ele encaixa no trilho da esquerda */
+.fx-panel-side-left {
+  border-left: 0;
+  border-right: 1px solid rgba(91, 184, 194, 0.28);
+  box-shadow: 22px 0 48px -16px rgba(0, 0, 0, 0.85);
 }
 .fx-panel-head {
   flex: none;
@@ -876,6 +919,123 @@ textarea.input { min-height: 90px; resize: vertical; }
 }
 .fx-panel-search::placeholder { color: rgba(236, 234, 231, 0.45); }
 .fx-panel-search:focus { outline: none; border-color: var(--fx-teal); }
+
+/* ── leitor de artigos (painel "Artigos") ──────────────────────────────────
+   Não é um painel de largura fixa: é a segunda metade da tela. Abrir um artigo
+   pela Biblioteca divide a página em duas — texto à esquerda, artigo à direita —
+   em vez de jogar o usuário para outra aba do navegador. A divisória é
+   arrastável (a largura vem do componente, em px). */
+.fx-reader {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  min-height: 0;
+  min-width: 0;
+  background: var(--fx-rail);
+  border-left: 1px solid rgba(91, 184, 194, 0.28);
+  box-shadow: -22px 0 48px -16px rgba(0, 0, 0, 0.85);
+}
+/* alça de arraste: fica sobre a borda, sem roubar largura do conteúdo */
+.fx-reader-grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  width: 7px;
+  z-index: 2;
+  cursor: col-resize;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  touch-action: none;
+}
+.fx-reader-grip:hover,
+.fx-reader-grip[data-dragging="true"] {
+  background: color-mix(in srgb, var(--fx-teal) 45%, transparent);
+}
+/* faixa de abas dos artigos abertos, logo abaixo do cabeçalho do painel */
+.fx-reader-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  flex: none;
+  padding: 6px 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  border-bottom: 1px solid rgba(236, 234, 231, 0.12);
+}
+.fx-reader-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 220px;
+  padding: 5px 8px;
+  flex: none;
+  border: 1px solid var(--fx-edge);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: rgba(236, 234, 231, 0.62);
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+.fx-reader-tab:hover { background: rgba(236, 234, 231, 0.08); color: var(--color-text); }
+.fx-reader-tab[aria-selected="true"] {
+  border-color: var(--fx-teal);
+  background: var(--fx-teal-soft);
+  color: var(--fx-teal);
+}
+.fx-reader-tab-close {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  flex: none;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+}
+.fx-reader-tab-close:hover { opacity: 1; background: rgba(236, 234, 231, 0.16); }
+/* a moldura do documento em si — chão escuro, o visualizador é do navegador */
+.fx-reader-frame {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: #0a0f10;
+}
+.fx-reader-frame iframe {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  /* transparente de propósito: se o site recusar o embed e nada for pintado,
+     o recado que está por baixo aparece em vez de um retângulo preto */
+  background: transparent;
+}
+/* Recado por baixo do iframe: se o site recusar exibição embutida
+   (X-Frame-Options), o quadro fica em branco e é este texto que aparece. */
+.fx-reader-fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 28px;
+  text-align: center;
+  color: rgba(236, 234, 231, 0.55);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
 
 /* barra de status */
 .fx-status {
@@ -992,6 +1152,21 @@ textarea.input { min-height: 90px; resize: vertical; }
 }
 /* espaçador de paginação — puro vão, sem margem para não colapsar nada */
 .folium-page-spacer { display: block; margin: 0; padding: 0; pointer-events: none; }
+
+/* Espaçador da virada *dentro* de um parágrafo: é o que reparte o parágrafo
+   entre duas folhas. Ocupa a largura inteira da coluna, então nunca divide uma
+   linha ao meio — cai sozinho numa caixa de linha e empurra o resto do texto
+   para a folha seguinte. `vertical-align: top` tira a entrelinha da conta, senão
+   a caixa ficaria mais alta que a altura medida e a paginação oscilaria. */
+.folium-line-spacer {
+  display: inline-block;
+  width: 100%;
+  vertical-align: top;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+  user-select: none;
+}
 
 /* Via de impressão: vazia na tela; o `WritingCanvas` só a preenche no
    `beforeprint`, com uma folha recortada por página (ver @media print). */

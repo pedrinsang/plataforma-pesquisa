@@ -23,7 +23,7 @@ function collectHeadings(editor: Editor): Heading[] {
 /**
  * Sumário do documento: lista os títulos (T1–T4) na ordem em que aparecem e
  * rola/posiciona o cursor na seção ao clicar — como o painel de navegação do
- * Word. Encaixa no trilho da direita, empurrando a folha.
+ * Word. Encaixa no trilho da esquerda (navegação do texto), empurrando a folha.
  */
 export function OutlinePanel({ editor, onClose }: { editor: Editor; onClose: () => void }) {
   const [headings, setHeadings] = useState<Heading[]>(() => collectHeadings(editor));
@@ -43,7 +43,7 @@ export function OutlinePanel({ editor, onClose }: { editor: Editor; onClose: () 
   }
 
   return (
-    <aside className="fx-panel print:hidden" aria-label="Sumário">
+    <aside className="fx-panel fx-panel-side-left print:hidden" aria-label="Sumário">
       <div className="fx-panel-head">
         <div className="flex items-center justify-between">
           <span className="fx-panel-title">
