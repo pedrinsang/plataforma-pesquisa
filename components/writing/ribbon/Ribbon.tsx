@@ -59,6 +59,7 @@ import {
   LINE_HEIGHTS,
   PARAGRAPH_SPACINGS,
 } from "@/lib/writing/editor-extensions";
+import { fontSizeToPt, ptToCss } from "@/lib/writing/typography";
 import { refreshAllStatSources } from "@/lib/writing/extensions/stat-chart";
 
 const BLOCK_STYLES = [
@@ -145,7 +146,7 @@ export function Ribbon(props: RibbonProps) {
         alignJustify: editor.isActive({ textAlign: "justify" }),
         headingLevel: [1, 2, 3, 4].find((l) => editor.isActive("heading", { level: l })) ?? 0,
         fontFamily: (editor.getAttributes("textStyle").fontFamily as string) ?? null,
-        fontSize: parseInt(String(editor.getAttributes("textStyle").fontSize ?? ""), 10) || null,
+        fontSize: fontSizeToPt(editor.getAttributes("textStyle").fontSize),
         color: (editor.getAttributes("textStyle").color as string) ?? null,
         highlight: (editor.getAttributes("highlight").color as string) ?? null,
         lineHeight: block.lineHeight ?? null,
@@ -263,7 +264,10 @@ export function Ribbon(props: RibbonProps) {
               )}
             </Popover>
 
-            <FontSizeStepper value={s.fontSize} onChange={(size) => chain().setFontSize(`${size}px`).run()} />
+            <FontSizeStepper
+              value={s.fontSize}
+              onChange={(size) => chain().setFontSize(ptToCss(size)).run()}
+            />
 
             <span className="flex items-center gap-0.5">
               <RibbonButton label="Negrito (Ctrl+B)" active={s.bold} onClick={() => chain().toggleBold().run()}>
@@ -475,10 +479,9 @@ export function Ribbon(props: RibbonProps) {
           <RibbonGroup label="Referência" gap={4}>
             <RibbonBigButton
               label="Citação"
-              title="Citação de referência — em breve"
+              title="Citar uma referência da biblioteca do projeto"
               icon={<BookMarked size={19} />}
-              onClick={() => {}}
-              disabled
+              onClick={props.onOpenReferences}
             />
             <RibbonBigButton
               label="Nota"

@@ -15,7 +15,12 @@ import {
   sheetTop,
   stackHeight,
 } from "@/lib/writing/page-metrics";
-import type { PageSpacer } from "@/lib/writing/extensions/pagination";
+import {
+  paginationKey,
+  sameSpacers,
+  SPACER_SELECTOR,
+  type PageSpacer,
+} from "@/lib/writing/extensions/pagination";
 
 /** Tolerância de medição (subpixel) antes de considerar que um bloco transbordou. */
 const EPS = 0.5;
@@ -40,6 +45,26 @@ const SPLITTABLE = new Set(["paragraph", "bulletList", "orderedList", "blockquot
  * longo precisa partir — a alternativa é atravessar a virada por cima do vão.
  */
 const SPLITTABLE_IF_TALL = new Set(["heading", "codeBlock"]);
+
+/**
+ * Quantas passadas de medição uma mesma geometria pode consumir antes de a
+ * paginação parar de reescrever o desenho. É uma trava de segurança: a medição
+ * deve convergir na segunda passada, e a única forma de gastar isto é um
+ * conteúdo em que ela não converge. Melhor congelar num desenho do que piscar.
+ */
+const MAX_PASSES = 8;
+
+/** Um espaçador de paginação — de bloco ou de linha — no DOM do editor. */
+function isSpacer(el: Element): boolean {
+  return (
+    el.classList.contains("folium-page-spacer") || el.classList.contains("folium-line-spacer")
+  );
+}
+
+/** Assinatura de um plano, para reconhecer que a medição entrou em ciclo. */
+function signature(spacers: PageSpacer[]): string {
+  return spacers.map((s) => `${s.pos}:${s.inline ? "i" : "b"}:${Math.round(s.height)}`).join("|");
+}
 
 /** Uma linha visual de um bloco, em coordenadas naturais do fluxo. */
 type Line = {
@@ -85,7 +110,12 @@ function readEntries(editor: Editor, zoom: number): Entry[] | null {
   let spacerAcc = 0;
   let index = 0;
   for (const child of Array.from(root.children) as HTMLElement[]) {
-    if (child.classList.contains("folium-page-spacer")) {
+    // Qualquer espaçador nosso, dos dois tipos: logo depois de uma edição o
+    // remapeamento pode deixar um vão de linha num lugar em que ele vira filho
+    // direto do editor. Se ele não for descontado aqui, todo bloco abaixo é
+    // medido baixo demais e o plano seguinte reserva vãos que não chegam à
+    // folha de baixo — a origem da última página piscando.
+    if (isSpacer(child)) {
       spacerAcc += child.offsetHeight;
       continue;
     }
@@ -118,7 +148,7 @@ function readEntries(editor: Editor, zoom: number): Entry[] | null {
 /** Soma dos espaçadores de virada que já estão dentro deste bloco. */
 function innerSpacerHeight(block: HTMLElement): number {
   let total = 0;
-  block.querySelectorAll<HTMLElement>(".folium-line-spacer").forEach((el) => {
+  block.querySelectorAll<HTMLElement>(SPACER_SELECTOR).forEach((el) => {
     total += el.offsetHeight;
   });
   return total;
@@ -148,9 +178,26 @@ function readLines(
   if (rects.length === 0) return null;
 
   const blockTop = block.getBoundingClientRect().top;
-  const spacerRects = Array.from(
-    block.querySelectorAll<HTMLElement>(".folium-line-spacer"),
-  ).map((el) => el.getBoundingClientRect());
+  const spacerRects = Array.from(block.querySelectorAll<HTMLElement>(SPACER_SELECTOR))
+    .map((el) => el.getBoundingClientRect())
+    .filter((r) => r.height > 0);
+
+  /** O retângulo cai na faixa de um espaçador já aplicado (não é texto). */
+  const insideSpacer = (top: number, bottom: number) => {
+    const middle = (top + bottom) / 2;
+    return spacerRects.some((s) => middle > s.top - 0.5 && middle < s.bottom + 0.5);
+  };
+
+  /**
+   * Vão já aplicado acima desta coordenada de tela, em px naturais. Substituir
+   * a antiga busca por retângulo idêntico é o que torna a medição estável: o
+   * navegador pode devolver a caixa do espaçador com altura de linha em vez da
+   * altura pedida (e o ProseMirror ainda insere separadores invisíveis ao lado
+   * de um widget), e qualquer diferença de meio pixel fazia o vão ser lido como
+   * uma linha de texto — daí em diante o plano inteiro saía deslocado.
+   */
+  const spacerAbove = (top: number) =>
+    spacerRects.reduce((sum, s) => (s.top < top - 0.5 ? sum + s.height : sum), 0) / zoom;
 
   // Um retângulo entra na faixa corrente quando o **meio** dele cai dentro dela.
   // Testar só a sobreposição não serve: com entrelinha apertada (os títulos em
@@ -160,6 +207,7 @@ function readLines(
   // continuam separadas.
   const bands: Array<{ top: number; bottom: number; left: number }> = [];
   for (const r of rects) {
+    if (insideSpacer(r.top, r.bottom)) continue;
     const last = bands[bands.length - 1];
     const middle = r.top + r.height / 2;
     if (last && middle > last.top && middle < last.bottom) {
@@ -172,17 +220,9 @@ function readLines(
   }
 
   const lines: Line[] = [];
-  let innerAcc = 0;
   for (const band of bands) {
     const height = band.bottom - band.top;
-    const spacer = spacerRects.find(
-      (s) => Math.abs(s.top - band.top) < 1 && Math.abs(s.height - height) < 1,
-    );
-    if (spacer) {
-      innerAcc += spacer.height / zoom;
-      continue;
-    }
-    const top = naturalTop + (band.top - blockTop) / zoom - innerAcc;
+    const top = naturalTop + (band.top - blockTop) / zoom - spacerAbove(band.top);
     // Onde a linha começa no documento. Sem isso não dá para ancorar o vão, e a
     // linha deixa de ser um ponto de virada válido (fica com `pos: -1`).
     const hit = editor.view.posAtCoords({ left: band.left + 1, top: band.top + height / 2 });
@@ -310,16 +350,6 @@ function splitEntry(entry: Entry, offsetIn: number, spacers: PageSpacer[]): numb
   return offset - offsetIn;
 }
 
-function sameSpacers(a: PageSpacer[], b: PageSpacer[]): boolean {
-  if (a.length !== b.length) return false;
-  return a.every(
-    (s, i) =>
-      s.pos === b[i].pos &&
-      Boolean(s.inline) === Boolean(b[i].inline) &&
-      Math.abs(s.height - b[i].height) < EPS,
-  );
-}
-
 /** Enfeites de edição que não existem no papel (cursor, alças, realces). */
 const EDITING_ONLY = ".ProseMirror-gapcursor, .column-resize-handle, .ProseMirror-separator";
 const EDITING_CLASSES = [
@@ -382,9 +412,14 @@ export function WritingCanvas({
   const flowRef = useRef<HTMLDivElement>(null);
   const stackRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
-  const appliedRef = useRef<PageSpacer[]>([]);
   const timerRef = useRef<number | null>(null);
+  // Planos já tentados desde a última mudança real de conteúdo/zoom/fonte.
+  const historyRef = useRef<string[]>([]);
+  const viewportRef = useRef({ scrollLeft: -1, gutter: -1 });
   const [pageCount, setPageCount] = useState(1);
+  // O total de páginas é lido dentro de listeners; num ref ele não precisa
+  // remontar o observador de rolagem a cada nova paginação.
+  const pageCountRef = useRef(1);
 
   // ── paginação: mede, planeja e aplica os espaçadores ─────────────────────
   const paginate = useCallback(() => {
@@ -392,11 +427,31 @@ export function WritingCanvas({
     const entries = readEntries(editor, zoom);
     if (!entries) return;
     const { spacers, pageCount: next } = planPages(entries);
-    setPageCount((prev) => (prev === next ? prev : next));
-    if (!sameSpacers(appliedRef.current, spacers)) {
-      appliedRef.current = spacers;
-      editor.commands.setPageSpacers(spacers);
+
+    // O que vale é o que o plugin tem aplicado, não uma cópia nossa: numa
+    // edição ele remapeia os espaçadores por conta própria, e comparar com uma
+    // cópia desatualizada deixaria o desenho preso num estado que ninguém mais
+    // recalcula.
+    const applied = paginationKey.getState(editor.state) ?? [];
+    if (sameSpacers(applied, spacers)) {
+      historyRef.current = [];
+      pageCountRef.current = next;
+      setPageCount((prev) => (prev === next ? prev : next));
+      return;
     }
+
+    // Se este plano já foi tentado desde a última mudança de conteúdo, a
+    // medição está em ciclo (aplicar A leva a medir B, e B de volta a A). Ficar
+    // no desenho atual é o único desfecho estável — sem isto o editor alterna
+    // entre dois desenhos para sempre, o que é a "página piscando" e também o
+    // aviso de "Maximum update depth" (cada volta é um setState novo).
+    const sig = signature(spacers);
+    if (historyRef.current.includes(sig) || historyRef.current.length >= MAX_PASSES) return;
+    historyRef.current.push(sig);
+
+    pageCountRef.current = next;
+    setPageCount((prev) => (prev === next ? prev : next));
+    editor.commands.setPageSpacers(spacers);
   }, [editor, zoom]);
 
   // Agenda com timer (e não `requestAnimationFrame`): rAF não roda em aba de
@@ -413,18 +468,24 @@ export function WritingCanvas({
   useEffect(() => {
     if (!editor) return;
     const flow = flowRef.current;
-    schedulePaginate();
-    editor.on("update", schedulePaginate);
+    // Conteúdo novo (ou zoom/fonte novos) é geometria nova: o orçamento de
+    // passadas recomeça. O ResizeObserver, não — as passadas que ele dispara
+    // são as nossas próprias, e é justamente delas que sai o ciclo.
+    const fresh = () => {
+      historyRef.current = [];
+      schedulePaginate();
+    };
+    fresh();
+    editor.on("update", fresh);
     // Fontes carregando, imagens chegando e a própria mudança de altura do fluxo
     // mexem na paginação; o ResizeObserver cobre todos esses casos.
     const ro = new ResizeObserver(schedulePaginate);
     if (flow) ro.observe(flow);
-    const onFonts = () => schedulePaginate();
-    document.fonts?.addEventListener?.("loadingdone", onFonts);
+    document.fonts?.addEventListener?.("loadingdone", fresh);
     return () => {
-      editor.off("update", schedulePaginate);
+      editor.off("update", fresh);
       ro.disconnect();
-      document.fonts?.removeEventListener?.("loadingdone", onFonts);
+      document.fonts?.removeEventListener?.("loadingdone", fresh);
       if (timerRef.current !== null) clearTimeout(timerRef.current);
       timerRef.current = null;
     };
@@ -441,9 +502,17 @@ export function WritingCanvas({
     const el = containerRef.current;
     if (!el) return;
     const handle = () => {
-      onViewport?.({ scrollLeft: el.scrollLeft, gutter: el.offsetWidth - el.clientWidth });
+      const scrollLeft = el.scrollLeft;
+      const gutter = el.offsetWidth - el.clientWidth;
+      // Só avisa quando muda de verdade: um objeto novo a cada medição é um
+      // `setState` novo a cada medição, e a régua não tem o que redesenhar.
+      const last = viewportRef.current;
+      if (last.scrollLeft !== scrollLeft || last.gutter !== gutter) {
+        viewportRef.current = { scrollLeft, gutter };
+        onViewport?.({ scrollLeft, gutter });
+      }
       const page = Math.floor(el.scrollTop / (PAGE_STRIDE_PX * zoom)) + 1;
-      onCurrentPageChange?.(Math.min(Math.max(page, 1), pageCount));
+      onCurrentPageChange?.(Math.min(Math.max(page, 1), pageCountRef.current));
     };
     handle();
     el.addEventListener("scroll", handle, { passive: true });
@@ -456,7 +525,7 @@ export function WritingCanvas({
       el.removeEventListener("scroll", handle);
       ro.disconnect();
     };
-  }, [zoom, pageCount, onCurrentPageChange, onViewport]);
+  }, [zoom, onCurrentPageChange, onViewport]);
 
   // ── via de impressão ─────────────────────────────────────────────────────
   // Imprimir/Baixar PDF não sai "print da tela" nem depende da paginação do

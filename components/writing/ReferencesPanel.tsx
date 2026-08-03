@@ -17,6 +17,7 @@ import { REFERENCE_TYPE_LABEL, type ReferenceRow } from "@/lib/references/types"
 import {
   articleFromReference,
   listProjectReferences,
+  refreshReferenceRegistry,
   type OpenArticle,
 } from "@/lib/writing/reference-sources";
 import { cn } from "@/lib/utils/cn";
@@ -64,17 +65,22 @@ export function ReferencesPanel({
   onOpenArticle,
   onCite,
   openArticleIds,
+  style,
+  onStyleChange,
 }: {
   projectId: string;
   onClose: () => void;
   onOpenArticle: (article: OpenArticle) => void;
-  onCite: (text: string) => void;
+  /** Insere a citação (indireta) da referência no ponto do cursor. */
+  onCite: (referenceId: string) => void;
   /** Ids já abertos no leitor — marcam o item como "aberto". */
   openArticleIds: string[];
+  /** Norma do documento — trocar aqui reescreve todas as citações do texto. */
+  style: CitationStyle;
+  onStyleChange: (style: CitationStyle) => void;
 }) {
   const [references, setReferences] = useState<ReferenceRow[] | null>(null);
   const [query, setQuery] = useState("");
-  const [style, setStyle] = useState<CitationStyle>("abnt");
 
   const load = useCallback(
     (signal?: { cancelled: boolean }) => {
@@ -120,6 +126,9 @@ export function ReferencesPanel({
               className="fx-panel-btn"
               onClick={() => {
                 setReferences(null);
+                // Recarrega também o registro que alimenta as citações do
+                // texto: editar uma referência conserta as chamadas dela.
+                refreshReferenceRegistry();
                 load();
               }}
               title="Recarregar"
@@ -158,7 +167,7 @@ export function ReferencesPanel({
             <button
               key={s}
               type="button"
-              onClick={() => setStyle(s)}
+              onClick={() => onStyleChange(s)}
               aria-pressed={style === s}
               className={cn(
                 "rounded-[4px] border px-2 py-0.5 transition-colors",
@@ -167,7 +176,7 @@ export function ReferencesPanel({
                   : "border-transparent text-text-dim hover:text-foreground",
               )}
               style={{ fontFamily: "var(--font-mono)", fontSize: "9.5px", letterSpacing: "0.14em" }}
-              title={`Citar na norma ${STYLE_SHORT[s]}`}
+              title={`Escrever o documento na norma ${STYLE_SHORT[s]}`}
             >
               {STYLE_SHORT[s]}
             </button>
@@ -248,7 +257,7 @@ export function ReferencesPanel({
                     )}
                     <button
                       type="button"
-                      onClick={() => onCite(inTextCitation(ref, style))}
+                      onClick={() => onCite(ref.id)}
                       className="fx-act !h-[24px] !px-2 !text-[11px]"
                       title={`Inserir ${inTextCitation(ref, style)} no texto`}
                     >
@@ -264,7 +273,7 @@ export function ReferencesPanel({
 
       <div className="flex flex-none items-center gap-1.5 border-t border-border-subtle px-3 py-2 text-[10.5px] text-text-dim">
         <BookOpen size={11} />
-        Abrir um artigo divide a tela — ele vai para o painel “Artigos”.
+        Abrir um artigo divide a tela — lá dá para marcar o trecho e já citar.
       </div>
     </aside>
   );

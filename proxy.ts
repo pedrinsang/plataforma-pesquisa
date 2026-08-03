@@ -46,6 +46,10 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // `pdfjs/` são os assets do leitor de PDF (worker, CMaps, fontes-padrão):
+    // arquivos de biblioteca, iguais para todo mundo e sem nada do usuário.
+    // Fora daqui eles custariam um `getUser()` no Supabase por arquivo — e o
+    // pdf.js busca vários por documento aberto.
+    "/((?!_next/static|_next/image|favicon.ico|pdfjs/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

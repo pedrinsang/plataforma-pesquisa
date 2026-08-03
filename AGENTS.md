@@ -117,12 +117,43 @@ qualquer tipo de fonte, PDF anexado em bucket privado, metadados importados de
 APIs públicas e gratuitas — Crossref/PubMed/arXiv/OpenLibrary/meta tags, **sem
 IA** — e formatação ABNT/APA/Vancouver em `lib/references/format.ts`).
 
+Feito também: **citar selecionando o trecho do artigo**. O PDF anexado deixou de
+ser um `<iframe>` e passou a ser desenhado por nós com **pdf.js**
+(`components/writing/PdfArticleView.tsx`, `lib/writing/pdf.ts`): o visualizador
+do navegador roda fora do nosso documento, então `getSelection()` não enxergava
+nada — sem renderizar o PDF não existe "selecionar e citar". Marcando um trecho
+aparece uma bolha (`CiteBubble`, no `ArticleReader`) com "Citar com o trecho" e
+"Só a chamada"; a página sai do `data-page` da folha onde a seleção começa e
+vira o `p. N`. `lib/writing/quote.ts` limpa o texto do PDF (junta a palavra que
+o PDF hifenizou na quebra, desfaz as quebras de linha) e monta a citação **na
+forma que a norma pede para aquele tamanho**: curta entre aspas no meio do
+parágrafo; longa em parágrafo próprio, recuado (4 cm na ABNT, 1,27 cm em
+APA/Vancouver), entrelinha simples e — na ABNT — corpo 10 pt. O corte é por
+caracteres na ABNT (que conta linhas) e por palavras na APA (que conta 40).
+A citação agora é um **nó vinculado** (`lib/writing/extensions/citation.tsx`):
+guarda `referenceId`/`citation_key`/página, não o texto — a forma é recalculada
+a partir da referência, então corrigir o ano na aba Referências conserta todas
+as chamadas no texto, e trocar a norma no painel reescreve o documento inteiro
+(`setCitationStyle`). O `label` fica gravado como retrato da última forma
+conhecida (é o que sai no HTML exportado e o que sobra se a linha sumir da
+biblioteca — nesse caso o nó fica dourado, "referência removida").
+Os assets de runtime do pdf.js (worker, CMaps, fontes-padrão, wasm, ICC) **não
+vão para o git**: `scripts/sync-pdfjs-assets.mjs` copia de `node_modules` para
+`public/pdfjs/` no `predev`/`prebuild`. Esse caminho está fora do matcher do
+`proxy.ts` — são arquivos de biblioteca, e dentro do matcher cada CMap custaria
+um `getUser()` no Supabase. O route handler do arquivo ganhou `?raw=1`, que
+devolve os **bytes** pela nossa origem: o pdf.js precisa ler por fetch, e assim
+não dependemos do CORS do Storage nem entregamos a URL assinada ao cliente.
+Link/DOI externo continua em `<iframe>` — é outra origem, a seleção não é
+legível, e o rodapé do leitor diz isso em vez de deixar o usuário tentando.
+
 Falta (do brief): feed de atividade (pode vir do `audit_log`), status do
-projeto, **citação da biblioteca dentro do projeto** (menção "@" no editor de
-Escrita usando `citation_key`, e vínculo de referência a casos/achados),
-histórico de versões do texto, bloco de ideias/kanban, **gráficos** (nenhuma lib
-instalada — o node `statChart` já prevê `statType: 'chart'` para quando existir),
-importação CSV/Excel, **campos customizáveis** das amostras e **achados**.
+projeto, **bibliografia gerada** no documento a partir dos nós de citação
+("Nova" e "Bibliografia" na faixa Referências seguem desabilitados) e vínculo de
+referência a casos/achados, histórico de versões do texto, bloco de
+ideias/kanban, **gráficos** (nenhuma lib instalada — o node `statChart` já prevê
+`statType: 'chart'` para quando existir), importação CSV/Excel, **campos
+customizáveis** das amostras e **achados**.
 
 Notas: o editor já tem link e imagem — quando o conteúdo for renderizado fora do
 TipTap (export/print), avaliar sanitização XSS do HTML. Upload de imagem usa o
@@ -150,7 +181,30 @@ blocos, não — transform não os afeta). As linhas são agrupadas em faixas pe
 sobreposição fundiria o bloco inteiro numa faixa só — sem ponto de virada, sem
 quebra. Título e bloco de código só partem quando são mais altos que a folha
 (`SPLITTABLE_IF_TALL`); tabela/imagem/gráfico não partem e, se forem mais altos
-que uma folha, ainda atravessam a virada — o `.folium-seam` mascara o vão. Convites não enviam e-mail (vinculam
+que uma folha, ainda atravessam a virada — o `.folium-seam` mascara o vão.
+A medição **desconta os dois tipos de espaçador em qualquer lugar do DOM**
+(`SPACER_SELECTOR`), e não só o de linha dentro do bloco: um vão que não é
+descontado faz todo bloco abaixo ser lido baixo demais, e o plano seguinte
+reserva vãos que não chegam à folha de baixo. Pelo mesmo motivo o remapeamento
+de posições no `apply` da extensão **preserva o `inline`** — sem ele um vão de
+linha vira `div` de bloco dentro do parágrafo depois de qualquer edição. As
+faixas de espaçador são reconhecidas por **sobreposição**, não por retângulo
+idêntico (o navegador pode devolver a caixa com altura de linha, e o ProseMirror
+insere separadores invisíveis ao lado de um widget). Por fim, `paginate` compara
+com o estado **do plugin** (não com uma cópia local) e guarda a assinatura dos
+planos já tentados desde a última mudança de conteúdo: repetir uma assinatura é
+ciclo (aplicar A leva a medir B, e B de volta a A) e a paginação congela no
+desenho atual em vez de piscar — era esse ciclo que também disparava o
+"Maximum update depth exceeded" do React, uma volta por `setState`.
+A tipografia da folha é medida em **unidades de papel**
+(`lib/writing/typography.ts`): a folha é A4 a 96 dpi, as mesmas medidas do Word,
+então o tamanho de fonte é gravado em `pt` (`setFontSize("12pt")`) e o corpo
+padrão de `.folium-editor` é **12 pt** — o "12" que os editais pedem, e não o
+1,125rem do `prose-lg`. Enquanto isso era px, "12" na faixa saía a 12 px (9 pt) e
+a contagem de páginas não batia com a do Word. Documentos antigos guardaram px;
+`fontSizeToPt` converte na leitura, então a caixa da faixa mostra o corpo real.
+Espaçamento de parágrafo e recuo de citação já vinham em pt/cm.
+Convites não enviam e-mail (vinculam
 por `invited_email` no cadastro). No editor em tela cheia, "Baixar PDF" e
 "Imprimir" são o mesmo `window.print()`, e o papel sai **igual à tela**: no
 `beforeprint` o `WritingCanvas` monta a **via de impressão** (`.folium-print`) —
@@ -175,8 +229,7 @@ artigo à direita, com divisória arrastável e abas dos artigos abertos. O PDF
 anexado entra pelo route handler de URL assinada (sempre embute); link/DOI
 externo entra em `sandbox` e pode ser recusado pelo site (X-Frame-Options) — por
 isso o recado de "abrir em nova aba" fica desenhado **por baixo** do iframe, que
-é transparente de propósito. Falta ainda: nó de citação vinculado e bibliografia
-gerada no documento ("Nova" e "Bibliografia" na faixa seguem desabilitados).
+é transparente de propósito.
 
 O espaçamento entre parágrafos é definido em `.folium-editor > *`
 (8 pt embaixo, 0 em cima; 12 pt antes dos títulos) e **não pode voltar para o

@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Cópia do pdf.js feita por scripts/sync-pdfjs-assets.mjs — código de
+    // terceiros, minificado, que não é nosso para arrumar.
+    "public/pdfjs/**",
   ]),
 ]);
 

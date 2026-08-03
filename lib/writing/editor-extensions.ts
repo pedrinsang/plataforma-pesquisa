@@ -19,6 +19,7 @@ import { PageBreak } from "@/lib/writing/extensions/page-break";
 import { Pagination } from "@/lib/writing/extensions/pagination";
 import { SearchReplace } from "@/lib/writing/extensions/search-replace";
 import { StatChart } from "@/lib/writing/extensions/stat-chart";
+import { Citation } from "@/lib/writing/extensions/citation";
 
 // Famílias de fonte curadas para a Escrita. As duas primeiras são as fontes da
 // identidade Folium (corpo/títulos); as demais são clássicas de processador de
@@ -34,8 +35,8 @@ export const FONT_FAMILIES: Array<{ label: string; value: string }> = [
   { label: "Courier New", value: '"Courier New", Courier, monospace' },
 ];
 
-// Tamanhos comuns (o campo também aceita digitar um valor arbitrário).
-export const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 30, 36, 48, 60, 72];
+// Tamanhos de fonte: ver `lib/writing/typography.ts` — são pontos (pt), como no
+// Word, e não px. A folha é A4 a 96 dpi, então "12" aqui é o "12" do edital.
 
 export const LINE_HEIGHTS: Array<{ label: string; value: string }> = [
   { label: "Simples", value: "1" },
@@ -58,8 +59,12 @@ export const PARAGRAPH_SPACINGS: Array<{ label: string; value: number }> = [
 /**
  * Conjunto de extensões do editor de Escrita. Centralizado aqui para o editor e
  * os testes usarem exatamente a mesma configuração.
+ *
+ * `projectId` é a biblioteca de onde as citações leem seus dados: sem ele o nó
+ * de citação ainda renderiza (pelo `label` gravado), mas para de se reformatar
+ * sozinho quando a referência muda.
  */
-export function buildEditorExtensions() {
+export function buildEditorExtensions({ projectId }: { projectId?: string } = {}) {
   return [
     StarterKit.configure({
       heading: { levels: [1, 2, 3, 4] },
@@ -87,5 +92,6 @@ export function buildEditorExtensions() {
     Pagination,
     SearchReplace,
     StatChart,
+    Citation.configure({ projectId: projectId ?? null }),
   ];
 }

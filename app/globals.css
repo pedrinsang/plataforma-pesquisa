@@ -516,6 +516,13 @@ textarea.input { min-height: 90px; resize: vertical; }
   flex-direction: column;
 }
 .folium-editor > * { flex: 0 0 auto; }
+
+/* Corpo padrão da folha em **pontos**, não no 1,125rem do `prose-lg`.
+   A folha é A4 a 96 dpi (as mesmas medidas do Word), então 12 pt aqui é o
+   mesmo 12 pt de lá: o texto sem tamanho explícito já nasce no corpo que a
+   maioria dos editais exige, e a caixa de tamanho da faixa mostra "12".
+   Os títulos continuam em `em` do `prose`, então acompanham proporcionalmente. */
+.folium-editor { font-size: 12pt; }
 /* imagens não devem esticar na transversal do flex — mantêm o tamanho e centram */
 .folium-editor > img { align-self: center; }
 
@@ -1036,6 +1043,152 @@ textarea.input { min-height: 90px; resize: vertical; }
   font-size: 12.5px;
   line-height: 1.6;
 }
+/* recado do PDF (carregando/erro): entra no fluxo da pilha, não por baixo dela */
+.fx-pdf-state { position: static; inset: auto; min-height: 240px; }
+/* rodapé do leitor: o que dá para fazer neste artigo */
+.fx-reader-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 7px 14px;
+  border-top: 1px solid rgba(236, 234, 231, 0.12);
+  color: rgba(236, 234, 231, 0.5);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+/* ── PDF desenhado por nós (pdf.js) ────────────────────────────────────────
+   O visualizador do navegador não deixa ler a seleção do usuário; este deixa,
+   e é daí que sai a citação com a página certa. */
+.fx-pdf { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.fx-pdf-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+  height: 30px;
+  padding: 0 10px;
+  border-bottom: 1px solid rgba(236, 234, 231, 0.12);
+  background: var(--fx-rail);
+}
+.fx-pdf-count,
+.fx-pdf-zoom {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: rgba(236, 234, 231, 0.55);
+  min-width: 38px;
+  text-align: center;
+}
+.fx-pdf-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0 28px;
+  /* o texto do artigo é para ser marcado — este é o ponto do painel */
+  user-select: text;
+}
+.fx-pdf-page {
+  position: relative;
+  flex: none;
+  background: #fff;
+  box-shadow: 0 2px 14px -4px rgba(0, 0, 0, 0.8);
+}
+.fx-pdf-page canvas { display: block; }
+
+/* camada de texto do pdf.js: spans transparentes sobre o canvas, na posição
+   exata de cada palavra. Reduzida do `pdf_viewer.css` do pacote — só o que a
+   seleção precisa (anotações e busca do visualizador oficial ficam de fora). */
+.textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  text-align: initial;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  z-index: 1;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+.textLayer span,
+.textLayer br {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+}
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  --scale-x: 1;
+  --rotate: 0deg;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+.textLayer .markedContent { display: contents; }
+.textLayer span[role="img"] { user-select: none; cursor: default; }
+.textLayer ::selection { background: color-mix(in srgb, var(--fx-teal) 42%, transparent); }
+.textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  user-select: none;
+}
+.textLayer.selecting .endOfContent { top: 0; }
+
+/* ── bolha de citação ──────────────────────────────────────────────────────
+   Aparece colada ao trecho marcado no artigo. Em coordenadas da janela: o
+   retângulo da seleção também é medido assim, e o leitor rola por dentro. */
+.fx-cite-bubble {
+  position: fixed;
+  z-index: 60;
+  width: 268px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 9px 10px;
+  border: 1px solid var(--fx-teal);
+  border-radius: var(--radius-md);
+  background: var(--fx-chrome);
+  box-shadow: 0 14px 34px -10px rgba(0, 0, 0, 0.9);
+}
+.fx-cite-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fx-teal);
+}
+.fx-cite-excerpt {
+  margin: 0;
+  max-height: 56px;
+  overflow: hidden;
+  color: rgba(236, 234, 231, 0.62);
+  font-size: 11.5px;
+  line-height: 1.45;
+  /* três linhas e reticências: é uma conferência, não a leitura do trecho */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
 
 /* barra de status */
 .fx-status {
@@ -1349,6 +1502,28 @@ textarea.input { min-height: 90px; resize: vertical; }
 .folium-editor blockquote {
   border-inline-start: 3px solid var(--color-accent-gold);
   font-style: italic;
+}
+
+/* ── citação vinculada à biblioteca ────────────────────────────────────────
+   Na folha ela é texto normal — é assim que sai no papel. O que a distingue
+   enquanto se escreve é um filete pontilhado embaixo, do tipo que some na
+   impressão: sinaliza "isto está preso à referência" sem virar enfeite. */
+.folium-editor .folium-citation {
+  white-space: nowrap;
+  border-bottom: 1px dotted color-mix(in srgb, var(--color-accent-teal) 55%, transparent);
+  cursor: default;
+}
+.folium-editor .folium-citation.is-missing {
+  border-bottom-style: solid;
+  border-bottom-color: var(--color-accent-gold);
+  color: var(--color-accent-gold);
+}
+.folium-editor .folium-citation.ProseMirror-selectednode {
+  background: color-mix(in srgb, var(--color-accent-teal) 22%, transparent);
+  border-radius: 2px;
+}
+@media print {
+  .folium-citation { border-bottom: 0 !important; color: inherit !important; }
 }
 
 /* ══════════════════════  impressão / exportar PDF  ══════════════════════

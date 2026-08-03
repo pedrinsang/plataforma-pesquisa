@@ -189,24 +189,33 @@ export function formatReference(ref: ReferenceRow, style: CitationStyle): string
   }
 }
 
-/** Citação no corpo do texto — o que a menção "@" vai inserir. */
-export function inTextCitation(ref: ReferenceRow, style: CitationStyle): string {
+/**
+ * Citação no corpo do texto. `locator` é a página de onde o trecho saiu — as
+ * três normas exigem esse dado na citação **direta** (transcrição literal) e o
+ * dispensam na indireta, por isso ele é opcional aqui.
+ */
+export function inTextCitation(
+  ref: ReferenceRow,
+  style: CitationStyle,
+  locator?: string | null,
+): string {
   const authors = parseAuthors(ref.authors);
   const year = ref.year ?? "s.d.";
-  if (authors.length === 0) return `(${ref.title.slice(0, 30)}, ${year})`;
+  const page = locator?.trim() ? `, p. ${locator.trim()}` : "";
+  if (authors.length === 0) return `(${ref.title.slice(0, 30)}, ${year}${page})`;
 
   if (style === "abnt") {
     const names =
       authors.length > 3
         ? `${authors[0].family.toUpperCase()} et al.`
         : authors.map((a) => a.family.toUpperCase()).join("; ");
-    return `(${names}, ${year})`;
+    return `(${names}, ${year}${page})`;
   }
   const names =
     authors.length > 2
       ? `${authors[0].family} et al.`
       : authors.map((a) => a.family).join(" & ");
-  return `(${names}, ${year})`;
+  return `(${names}, ${year}${page})`;
 }
 
 // ── chave de citação ────────────────────────────────────────────────────────

@@ -25,7 +25,10 @@ declare module "@tiptap/core" {
   }
 }
 
-function sameSpacers(a: PageSpacer[], b: PageSpacer[]): boolean {
+/** Seletor dos dois tipos de espaçador — a medição do canvas depende dele. */
+export const SPACER_SELECTOR = ".folium-page-spacer, .folium-line-spacer";
+
+export function sameSpacers(a: PageSpacer[], b: PageSpacer[]): boolean {
   if (a.length !== b.length) return false;
   return a.every(
     (s, i) =>
@@ -74,9 +77,15 @@ export const Pagination = Extension.create({
             if (!tr.docChanged) return value;
             // Reposiciona os espaçadores existentes; a medição seguinte corrige
             // as alturas, isto só evita que "pulem" durante a digitação.
+            //
+            // O `inline` tem de sobreviver ao remapeamento: sem ele um vão que
+            // reparte um parágrafo vira um `div` de bloco **dentro** do
+            // parágrafo, o que quebra o texto em blocos anônimos e faz a
+            // medição seguinte ler a folha errada — era daí que vinha a
+            // paginação oscilando entre dois desenhos.
             return value
-              .map((s) => ({ pos: tr.mapping.map(s.pos, -1), height: s.height }))
-              .filter((s) => s.height > 0.5);
+              .map((s) => ({ ...s, pos: tr.mapping.map(s.pos, -1) }))
+              .filter((s) => s.height > 0.5 && s.pos >= 0 && s.pos <= tr.doc.content.size);
           },
         },
 

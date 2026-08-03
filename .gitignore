@@ -41,6 +41,9 @@ yarn-error.log*
 # Claude Code local session state
 /.claude/
 
+# assets do pdf.js copiados por scripts/sync-pdfjs-assets.mjs
+/public/pdfjs/
+
 # vercel
 .vercel
 

@@ -1,12 +1,35 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
-import { BookMarked, ExternalLink, Files, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  BookMarked,
+  ExternalLink,
+  Files,
+  Quote,
+  TextQuote,
+  X,
+} from "lucide-react";
 import type { OpenArticle } from "@/lib/writing/reference-sources";
+import { PdfArticleView, type PdfSelection } from "@/components/writing/PdfArticleView";
+import { cleanExcerpt } from "@/lib/writing/quote";
 
 /** Limites da divisória, em px — nem o texto nem o artigo podem sumir. */
 const MIN_WIDTH = 320;
 const MIN_CANVAS = 380;
+
+/** Tamanho da bolha de citação, para ela não escapar da janela. */
+const BUBBLE_WIDTH = 268;
+const BUBBLE_GAP = 10;
+
+/** O que o leitor manda para o documento quando o usuário manda citar. */
+export type CiteRequest = {
+  /** Id da referência — é o mesmo id do artigo aberto. */
+  referenceId: string;
+  /** Página do PDF de onde o trecho saiu; `null` na citação indireta. */
+  locator: string | null;
+  /** Trecho transcrito; `null` quando é só a chamada. */
+  excerpt: string | null;
+};
 
 /**
  * Leitor de artigos lado a lado: a metade direita da tela mostra o PDF (ou a
@@ -14,9 +37,12 @@ const MIN_CANVAS = 380;
  * É o painel "Artigos" do trilho — abrir algo pela Biblioteca traz o item para
  * cá em vez de abrir outra aba do navegador.
  *
- * O PDF anexado sai do nosso route handler (URL assinada), então sempre exibe.
- * Um link externo pode recusar exibição embutida (X-Frame-Options); nesse caso
- * o quadro fica em branco e aparece o recado que fica desenhado por baixo dele.
+ * O PDF anexado é desenhado por nós (`PdfArticleView`), e é isso que destrava
+ * o principal: **marcar um trecho do artigo e mandá-lo para o texto já citado**,
+ * com a página certa. Um link/DOI externo continua num `<iframe>` — ali o
+ * conteúdo é de outra origem, não dá para ler a seleção, e o site ainda pode
+ * recusar a exibição embutida (X-Frame-Options); por isso o recado fica
+ * desenhado por baixo do quadro, que é transparente de propósito.
  */
 export function ArticleReader({
   articles,
@@ -27,6 +53,7 @@ export function ArticleReader({
   onCloseArticle,
   onClose,
   onOpenLibrary,
+  onCite,
 }: {
   articles: OpenArticle[];
   activeId: string | null;
@@ -36,10 +63,12 @@ export function ArticleReader({
   onCloseArticle: (id: string) => void;
   onClose: () => void;
   onOpenLibrary: () => void;
+  onCite: (request: CiteRequest) => void;
 }) {
   const active = articles.find((a) => a.id === activeId) ?? articles[0] ?? null;
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const gripRef = useRef<HTMLButtonElement>(null);
+  const [selection, setSelection] = useState<PdfSelection | null>(null);
 
   const clamp = useCallback(
     (px: number) => Math.max(MIN_WIDTH, Math.min(px, window.innerWidth - MIN_CANVAS)),
@@ -80,6 +109,15 @@ export function ArticleReader({
     return () => window.removeEventListener("resize", onResize);
   }, [clamp, width, onWidthChange]);
 
+  /** Manda a citação para o documento e desfaz a marcação no artigo. */
+  function cite(request: CiteRequest) {
+    onCite(request);
+    setSelection(null);
+    document.getSelection()?.removeAllRanges();
+  }
+
+  const excerpt = selection ? cleanExcerpt(selection.text) : "";
+
   return (
     <aside className="fx-reader print:hidden" style={{ width }} aria-label="Artigos abertos">
       <button
@@ -107,16 +145,27 @@ export function ArticleReader({
           </span>
           <span className="flex items-center gap-2">
             {active && (
-              <a
-                href={active.externalHref}
-                target="_blank"
-                rel="noreferrer"
-                className="fx-panel-btn"
-                title="Abrir em nova aba do navegador"
-                aria-label="Abrir em nova aba do navegador"
-              >
-                <ExternalLink size={12} />
-              </a>
+              <>
+                <button
+                  type="button"
+                  className="fx-panel-btn"
+                  onClick={() => cite({ referenceId: active.id, locator: null, excerpt: null })}
+                  title="Inserir a chamada deste artigo no ponto do cursor"
+                  aria-label="Citar este artigo"
+                >
+                  <Quote size={12} />
+                </button>
+                <a
+                  href={active.externalHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="fx-panel-btn"
+                  title="Abrir em nova aba do navegador"
+                  aria-label="Abrir em nova aba do navegador"
+                >
+                  <ExternalLink size={12} />
+                </a>
+              </>
             )}
             <button
               type="button"
@@ -152,7 +201,7 @@ export function ArticleReader({
                 type="button"
                 className="fx-reader-tab-close"
                 onClick={() => onCloseArticle(article.id)}
-                title="Fechar este artigo"
+                title={`Fechar ${article.title}`}
                 aria-label={`Fechar ${article.title}`}
               >
                 <X size={10} />
@@ -164,33 +213,35 @@ export function ArticleReader({
 
       <div className="fx-reader-frame">
         {active ? (
-          <>
-            <div className="fx-reader-fallback">
-              <ExternalLink size={20} />
-              <p>
-                Se nada aparecer, o site do artigo não permite exibição embutida.
-                <br />
-                <a
-                  href={active.externalHref}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-accent-teal hover:underline"
-                >
-                  Abrir em nova aba
-                </a>
-              </p>
-            </div>
-            <iframe
-              key={active.id}
-              src={active.src}
-              title={active.title}
-              // O PDF é nosso (URL assinada); um link externo entra em caixa-forte.
-              sandbox={
-                active.isFile ? undefined : "allow-scripts allow-same-origin allow-popups allow-forms"
-              }
-              referrerPolicy="no-referrer"
-            />
-          </>
+          active.isFile ? (
+            <PdfArticleView key={active.id} src={active.src} onSelectionChange={setSelection} />
+          ) : (
+            <>
+              <div className="fx-reader-fallback">
+                <ExternalLink size={20} />
+                <p>
+                  Se nada aparecer, o site do artigo não permite exibição embutida.
+                  <br />
+                  <a
+                    href={active.externalHref}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-accent-teal hover:underline"
+                  >
+                    Abrir em nova aba
+                  </a>
+                </p>
+              </div>
+              <iframe
+                key={active.id}
+                src={active.src}
+                title={active.title}
+                // Conteúdo de terceiros: entra em caixa-forte.
+                sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                referrerPolicy="no-referrer"
+              />
+            </>
+          )
         ) : (
           <div className="fx-reader-fallback">
             <Files size={22} />
@@ -201,6 +252,91 @@ export function ArticleReader({
           </div>
         )}
       </div>
+
+      {/* Rodapé com o que dá para fazer neste artigo. Num link externo a
+          seleção não é legível — melhor dizer isso do que deixar o usuário
+          tentando marcar o texto sem entender por que nada acontece. */}
+      {active && (
+        <div className="fx-reader-foot">
+          <TextQuote size={11} />
+          {active.isFile
+            ? "Marque um trecho do artigo para citá-lo direto no texto."
+            : "Só o PDF anexado permite citar por seleção — links externos são de outro site."}
+        </div>
+      )}
+
+      {selection && excerpt && active && (
+        <CiteBubble
+          rect={selection.rect}
+          page={selection.page}
+          excerpt={excerpt}
+          onQuote={() =>
+            cite({ referenceId: active.id, locator: String(selection.page), excerpt })
+          }
+          onCallOnly={() =>
+            cite({ referenceId: active.id, locator: String(selection.page), excerpt: null })
+          }
+          onDismiss={() => setSelection(null)}
+        />
+      )}
     </aside>
+  );
+}
+
+/**
+ * Bolha que aparece colada ao trecho marcado. Fica em coordenadas da janela
+ * (`position: fixed`) porque o retângulo da seleção também é medido assim — e
+ * porque o leitor rola por dentro, o que faria uma bolha absoluta se descolar.
+ */
+function CiteBubble({
+  rect,
+  page,
+  excerpt,
+  onQuote,
+  onCallOnly,
+  onDismiss,
+}: {
+  rect: DOMRect;
+  page: number;
+  excerpt: string;
+  onQuote: () => void;
+  onCallOnly: () => void;
+  onDismiss: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onDismiss();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onDismiss]);
+
+  const left = Math.min(
+    Math.max(BUBBLE_GAP, rect.left + rect.width / 2 - BUBBLE_WIDTH / 2),
+    window.innerWidth - BUBBLE_WIDTH - BUBBLE_GAP,
+  );
+  // Acima do trecho quando há espaço; abaixo quando a seleção começa no topo.
+  const above = rect.top > 132;
+  const style = above
+    ? { left, bottom: window.innerHeight - rect.top + BUBBLE_GAP }
+    : { left, top: rect.bottom + BUBBLE_GAP };
+
+  return (
+    <div className="fx-cite-bubble" style={style} role="dialog" aria-label="Citar o trecho">
+      <div className="fx-cite-meta">
+        <span>p. {page}</span>
+        <span>·</span>
+        <span>{excerpt.split(/\s+/).length} palavras</span>
+      </div>
+      <p className="fx-cite-excerpt">{excerpt}</p>
+      <div className="flex items-center gap-1.5">
+        <button type="button" className="fx-act fx-act-teal !h-[26px] !px-2 !text-[11px]" onClick={onQuote}>
+          <TextQuote size={12} /> Citar com o trecho
+        </button>
+        <button type="button" className="fx-act !h-[26px] !px-2 !text-[11px]" onClick={onCallOnly}>
+          <Quote size={12} /> Só a chamada
+        </button>
+      </div>
+    </div>
   );
 }

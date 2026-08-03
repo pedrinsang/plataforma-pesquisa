@@ -23,6 +23,58 @@ export async function listProjectReferences(projectId: string): Promise<Referenc
   }));
 }
 
+// ── registro das referências vistas pelos nós de citação ────────────────────
+// Um documento pode ter dezenas de citações apontando para a mesma biblioteca.
+// Em vez de cada nó buscar a sua linha, o projeto inteiro é carregado uma vez e
+// fica indexado por id. É o mesmo desenho do cache de `stat-sources`.
+
+const registry = new Map<string, Promise<Map<string, ReferenceRow>>>();
+const resolved = new Map<string, Map<string, ReferenceRow>>();
+
+const REFRESH_EVENT = "folium:references-refresh";
+
+function loadRegistry(projectId: string): Promise<Map<string, ReferenceRow>> {
+  let pending = registry.get(projectId);
+  if (!pending) {
+    pending = listProjectReferences(projectId).then((rows) => {
+      const map = new Map(rows.map((row) => [row.id, row]));
+      resolved.set(projectId, map);
+      return map;
+    });
+    registry.set(projectId, pending);
+  }
+  return pending;
+}
+
+/** A referência citada, ou `null` se ela foi removida da biblioteca. */
+export async function getReference(
+  projectId: string,
+  referenceId: string,
+): Promise<ReferenceRow | null> {
+  const map = await loadRegistry(projectId);
+  return map.get(referenceId) ?? null;
+}
+
+/** Leitura síncrona — só devolve algo se o projeto já tiver sido carregado. */
+export function peekReference(projectId: string, referenceId: string): ReferenceRow | null {
+  return resolved.get(projectId)?.get(referenceId) ?? null;
+}
+
+/**
+ * Descarta o cache e manda os nós de citação buscarem de novo — usado quando a
+ * biblioteca muda com o editor aberto (o painel Referências recarrega).
+ */
+export function refreshReferenceRegistry() {
+  registry.clear();
+  resolved.clear();
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(REFRESH_EVENT));
+}
+
+export function onReferencesRefresh(handler: () => void): () => void {
+  window.addEventListener(REFRESH_EVENT, handler);
+  return () => window.removeEventListener(REFRESH_EVENT, handler);
+}
+
 /** Artigo aberto no leitor lado a lado. */
 export type OpenArticle = {
   id: string;

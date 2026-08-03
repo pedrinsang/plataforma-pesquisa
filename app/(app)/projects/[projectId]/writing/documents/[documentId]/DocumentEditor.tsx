@@ -14,7 +14,7 @@ import {
 } from "@/components/writing/SideRail";
 import { StatPanel } from "@/components/writing/StatPanel";
 import { ReferencesPanel } from "@/components/writing/ReferencesPanel";
-import { ArticleReader } from "@/components/writing/ArticleReader";
+import { ArticleReader, type CiteRequest } from "@/components/writing/ArticleReader";
 import { WritingCanvas } from "@/components/writing/WritingCanvas";
 import { RulerBand } from "@/components/writing/WritingRuler";
 import { WritingStatusBar } from "@/components/writing/WritingStatusBar";
@@ -22,7 +22,9 @@ import { SearchReplacePanel } from "@/components/writing/SearchReplacePanel";
 import { buildEditorExtensions } from "@/lib/writing/editor-extensions";
 import { ZOOM_DEFAULT } from "@/lib/writing/page-metrics";
 import type { StatSourceKind } from "@/lib/writing/stat-sources";
-import type { OpenArticle } from "@/lib/writing/reference-sources";
+import { getReference, type OpenArticle } from "@/lib/writing/reference-sources";
+import { buildCitationInsert } from "@/lib/writing/quote";
+import type { CitationStyle } from "@/lib/references/format";
 import {
   updateDocumentContent,
   updateDocumentTitle,
@@ -87,6 +89,9 @@ export function DocumentEditor({
   const [articles, setArticles] = useState<OpenArticle[]>([]);
   const [activeArticle, setActiveArticle] = useState<string | null>(null);
   const [readerWidth, setReaderWidth] = useState(READER_WIDTH_DEFAULT);
+  // Norma do documento inteiro: as citações guardam o vínculo, não o texto, e
+  // se reescrevem quando isto muda.
+  const [citationStyle, setCitationStyle] = useState<CitationStyle>("abnt");
   const [linkOpenSignal, setLinkOpenSignal] = useState(0);
   const [search, setSearch] = useState<{ open: boolean; replace: boolean }>({
     open: false,
@@ -114,7 +119,7 @@ export function DocumentEditor({
   );
 
   const editor = useEditor({
-    extensions: buildEditorExtensions(),
+    extensions: buildEditorExtensions({ projectId }),
     content: (initialContent as never) ?? null,
     immediatelyRender: false,
     editorProps: {
@@ -231,8 +236,30 @@ export function DocumentEditor({
     if (activeArticle === id) setActiveArticle(next.at(-1)?.id ?? null);
   }
 
-  function handleCite(text: string) {
-    editor?.chain().focus().insertContent(text).run();
+  /**
+   * Insere uma citação vinculada no ponto do cursor. Vem de dois lugares: do
+   * botão "Citar" da biblioteca (citação indireta, sem trecho) e da bolha do
+   * leitor de artigos (citação direta, com o trecho marcado e a página).
+   * A forma — aspas no meio do parágrafo ou bloco recuado — sai da norma e do
+   * tamanho do trecho, em `buildCitationInsert`.
+   */
+  async function handleCite({ referenceId, locator, excerpt }: CiteRequest) {
+    if (!editor) return;
+    const reference = await getReference(projectId, referenceId);
+    if (!reference) return;
+    const { content } = buildCitationInsert({
+      reference,
+      style: citationStyle,
+      locator,
+      excerpt,
+    });
+    editor.chain().focus().insertContent(content).run();
+  }
+
+  /** Trocar a norma reescreve todas as citações já postas no documento. */
+  function handleCitationStyleChange(next: CitationStyle) {
+    setCitationStyle(next);
+    editor?.commands.setCitationStyle(next);
   }
 
   return (
@@ -324,8 +351,10 @@ export function DocumentEditor({
             projectId={projectId}
             onClose={() => setRightPanel(null)}
             onOpenArticle={handleOpenArticle}
-            onCite={handleCite}
+            onCite={(referenceId) => void handleCite({ referenceId, locator: null, excerpt: null })}
             openArticleIds={articles.map((a) => a.id)}
+            style={citationStyle}
+            onStyleChange={handleCitationStyleChange}
           />
         )}
         {rightPanel === "articles" && (
@@ -338,6 +367,7 @@ export function DocumentEditor({
             onCloseArticle={handleCloseArticle}
             onClose={() => setRightPanel(null)}
             onOpenLibrary={() => setRightPanel("references")}
+            onCite={(request) => void handleCite(request)}
           />
         )}
 
