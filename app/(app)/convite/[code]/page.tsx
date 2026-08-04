@@ -27,18 +27,28 @@ const PROBLEMS: Record<string, string> = {
   exhausted: "Este convite já atingiu o limite de usos.",
   wrong_email:
     "Este convite foi enviado para outro e-mail. Entre com a conta que recebeu o convite.",
+  rpc_error:
+    "Não foi possível consultar este convite agora. Tente novamente em instantes — o link continua válido.",
 };
 
 export default async function InvitePage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
   const supabase = await createClient();
 
-  const { data } = await supabase.rpc("preview_project_invite", {
+  const { data, error } = await supabase.rpc("preview_project_invite", {
     p_code: normalizeInviteCode(decodeURIComponent(code)),
   });
 
+  // Falha da RPC não é o mesmo que convite inexistente: tratar as duas como
+  // "não existe" mandava o convidado embora dizendo uma inverdade, e escondia
+  // o defeito. O motivo vai para o log do servidor e a tela pede para tentar
+  // de novo, sem culpar o link.
+  if (error) {
+    console.error(`[convite] preview_project_invite falhou: ${error.message}`);
+  }
+
   const invite = (data as Preview[] | null)?.[0];
-  const status = invite?.status ?? "not_found";
+  const status = error ? "rpc_error" : (invite?.status ?? "not_found");
   const problem = PROBLEMS[status];
 
   return (
