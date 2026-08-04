@@ -5,7 +5,7 @@ import {
   type NodeViewProps,
 } from "@tiptap/react";
 import { useEffect, useState } from "react";
-import { inTextCitation, type CitationStyle } from "@/lib/references/format";
+import { inTextCitation, narrativeCitation, type CitationStyle } from "@/lib/references/format";
 import {
   getReference,
   onReferencesRefresh,
@@ -21,9 +21,27 @@ export type CitationAttrs = {
   locator: string | null;
   /** Norma em que esta citação está escrita. */
   style: CitationStyle;
+  /**
+   * Chamada **narrativa**: o autor faz parte da frase e sai do parêntese
+   * ("Silva (2019, p. 35) afirma…"). É a mesma citação — muda só onde o nome
+   * cai —, por isso é atributo e não outro tipo de nó.
+   */
+  narrative: boolean;
   /** Última forma renderizada. Serve de fallback e é o que sai no HTML. */
   label: string;
 };
+
+/** A forma visível da citação, conforme a norma e a posição do autor. */
+function renderCitation(
+  reference: Parameters<typeof inTextCitation>[0],
+  style: CitationStyle,
+  locator: string | null,
+  narrative: boolean,
+): string {
+  return narrative
+    ? narrativeCitation(reference, style, locator)
+    : inTextCitation(reference, style, locator);
+}
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
@@ -42,13 +60,15 @@ export type CitationOptions = {
 };
 
 function CitationView({ node, updateAttributes, extension }: NodeViewProps) {
-  const { referenceId, locator, style, label } = node.attrs as CitationAttrs;
+  const { referenceId, locator, style, narrative, label } = node.attrs as CitationAttrs;
   const { projectId } = extension.options as CitationOptions;
 
   // Começa pelo que já estiver em memória: numa releitura do documento a
   // biblioteca costuma já estar carregada, e assim não há piscada de texto.
   const known = projectId && referenceId ? peekReference(projectId, referenceId) : null;
-  const [text, setText] = useState(known ? inTextCitation(known, style, locator) : label);
+  const [text, setText] = useState(
+    known ? renderCitation(known, style, locator, narrative) : label,
+  );
   const [missing, setMissing] = useState(false);
 
   useEffect(() => {
@@ -59,7 +79,7 @@ function CitationView({ node, updateAttributes, extension }: NodeViewProps) {
       void getReference(projectId, referenceId).then((reference) => {
         if (cancelled) return;
         setMissing(!reference);
-        if (reference) setText(inTextCitation(reference, style, locator));
+        if (reference) setText(renderCitation(reference, style, locator, narrative));
       });
     };
 
@@ -69,7 +89,7 @@ function CitationView({ node, updateAttributes, extension }: NodeViewProps) {
       cancelled = true;
       off();
     };
-  }, [projectId, referenceId, style, locator]);
+  }, [projectId, referenceId, style, locator, narrative]);
 
   // Mantém o atributo `label` alinhado ao que está na tela: é ele que sai no
   // HTML exportado e o que aparece se a biblioteca não puder ser lida depois.
@@ -140,6 +160,11 @@ export const Citation = Node.create<CitationOptions>({
         parseHTML: (el) => (el.getAttribute("data-style") as CitationStyle) || "abnt",
         renderHTML: (attrs) => ({ "data-style": attrs.style ?? "abnt" }),
       },
+      narrative: {
+        default: false,
+        parseHTML: (el) => el.getAttribute("data-narrative") === "true",
+        renderHTML: (attrs) => (attrs.narrative ? { "data-narrative": "true" } : {}),
+      },
       label: {
         default: "",
         parseHTML: (el) => el.textContent ?? "",
@@ -181,6 +206,7 @@ export const Citation = Node.create<CitationOptions>({
                 citationKey: attrs.citationKey ?? null,
                 locator: attrs.locator ?? null,
                 style: attrs.style ?? "abnt",
+                narrative: attrs.narrative ?? false,
                 label: attrs.label ?? "",
               },
             })

@@ -173,6 +173,11 @@ export interface Database {
           word_goal: number | null;
           header_text: string | null;
           footer_text: string | null;
+          margin_top: number;
+          margin_right: number;
+          margin_bottom: number;
+          margin_left: number;
+          line_height: number | null;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -186,6 +191,11 @@ export interface Database {
           word_goal?: number | null;
           header_text?: string | null;
           footer_text?: string | null;
+          margin_top?: number;
+          margin_right?: number;
+          margin_bottom?: number;
+          margin_left?: number;
+          line_height?: number | null;
           created_by: string;
         };
         Update: {
@@ -195,6 +205,11 @@ export interface Database {
           word_goal?: number | null;
           header_text?: string | null;
           footer_text?: string | null;
+          margin_top?: number;
+          margin_right?: number;
+          margin_bottom?: number;
+          margin_left?: number;
+          line_height?: number | null;
         };
         Relationships: [
           {
@@ -502,6 +517,13 @@ export interface Database {
           issue: string | null;
           pages: string | null;
           edition: string | null;
+          place: string | null;
+          institution: string | null;
+          degree: string | null;
+          program: string | null;
+          issued_month: string | null;
+          year_text: string | null;
+          event_number: string | null;
           abstract: string | null;
           isbn: string | null;
           issn: string | null;
@@ -536,6 +558,13 @@ export interface Database {
           issue?: string | null;
           pages?: string | null;
           edition?: string | null;
+          place?: string | null;
+          institution?: string | null;
+          degree?: string | null;
+          program?: string | null;
+          issued_month?: string | null;
+          year_text?: string | null;
+          event_number?: string | null;
           abstract?: string | null;
           isbn?: string | null;
           issn?: string | null;
@@ -566,6 +595,13 @@ export interface Database {
           issue?: string | null;
           pages?: string | null;
           edition?: string | null;
+          place?: string | null;
+          institution?: string | null;
+          degree?: string | null;
+          program?: string | null;
+          issued_month?: string | null;
+          year_text?: string | null;
+          event_number?: string | null;
           abstract?: string | null;
           isbn?: string | null;
           issn?: string | null;

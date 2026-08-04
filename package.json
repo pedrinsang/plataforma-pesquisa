@@ -8,6 +8,7 @@
     "prebuild": "node scripts/sync-pdfjs-assets.mjs",
     "build": "next build",
     "start": "next start",
+    "test": "node --test scripts/test-*.mjs",
     "lint": "eslint"
   },
   "dependencies": {

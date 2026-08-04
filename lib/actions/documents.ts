@@ -75,6 +75,41 @@ export async function updateDocumentHeaderFooter(
     .eq("id", documentId);
 }
 
+/**
+ * Configuração de página do documento — margens (cm) e entrelinha do corpo.
+ * Os limites repetem os CHECKs da tabela: a paginação mede a área de texto a
+ * partir daqui, e uma margem maior que a folha deixaria a altura útil negativa.
+ */
+export async function updateDocumentPageSetup(
+  documentId: string,
+  setup: {
+    marginTop: number;
+    marginRight: number;
+    marginBottom: number;
+    marginLeft: number;
+    /** `null` = a entrelinha padrão do editor, que é o que o documento já tinha. */
+    lineHeight: number | null;
+  },
+) {
+  const cm = (v: number, max: number) =>
+    Math.min(Math.max(Number.isFinite(v) ? v : 0, 0), max);
+
+  const supabase = await createClient();
+  await supabase
+    .from("documents")
+    .update({
+      margin_top: cm(setup.marginTop, 10),
+      margin_right: cm(setup.marginRight, 10),
+      margin_bottom: cm(setup.marginBottom, 10),
+      margin_left: cm(setup.marginLeft, 10),
+      line_height:
+        setup.lineHeight === null || !Number.isFinite(setup.lineHeight)
+          ? null
+          : Math.min(Math.max(setup.lineHeight, 0.5), 3),
+    })
+    .eq("id", documentId);
+}
+
 export async function deleteDocument(documentId: string, projectId: string) {
   const supabase = await createClient();
   await supabase.from("documents").delete().eq("id", documentId);

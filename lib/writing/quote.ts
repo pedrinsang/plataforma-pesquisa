@@ -2,6 +2,7 @@ import type { JSONContent } from "@tiptap/core";
 import { inTextCitation, type CitationStyle } from "@/lib/references/format";
 import type { ReferenceRow } from "@/lib/references/types";
 import { PX_PER_CM } from "@/lib/writing/page-metrics";
+import { measureTextLines } from "@/lib/writing/line-metrics";
 
 // Montagem da citação que entra no documento quando o usuário marca um trecho
 // do artigo no leitor ao lado. As normas separam dois casos, e a diferença é
@@ -14,14 +15,22 @@ import { PX_PER_CM } from "@/lib/writing/page-metrics";
 // O corte entre uma e outra muda conforme a norma (ABNT conta linhas; APA conta
 // palavras), então cada uma tem seu teste.
 
-/** Recuo do bloco de citação longa, por norma. */
+/**
+ * Recuo do bloco de citação longa, por norma. Na NBR 10520 os 4 cm deixaram de
+ * ser prescrição em 2023 ("recuo padronizado em relação à margem esquerda,
+ * recomenda-se 4 cm") — continuam sendo o que todo manual pede, então é o
+ * padrão; o que a revisão trouxe é que 4 cm não é mais o único valor aceitável.
+ */
 const BLOCK_INDENT_CM: Record<CitationStyle, number> = {
-  abnt: 4, // NBR 10520: recuo de 4 cm da margem esquerda
+  abnt: 4,
   apa: 1.27, // APA 7: meia polegada
   vancouver: 1.27,
 };
 
-/** Corpo do bloco de citação longa (a ABNT pede um ponto abaixo do texto). */
+/**
+ * Corpo do bloco de citação longa. A ABNT pede "letra menor que a utilizada no
+ * texto"; com o corpo padrão da folha em 12 pt, 10 pt é a escolha corrente.
+ */
 const BLOCK_FONT_SIZE: Record<CitationStyle, string | null> = {
   abnt: "10pt",
   apa: null,
@@ -29,11 +38,11 @@ const BLOCK_FONT_SIZE: Record<CitationStyle, string | null> = {
 };
 
 /**
- * ABNT mede a citação em **linhas** (mais de 3 vira bloco). Como o número de
- * linhas depende do corpo e da largura da coluna, aproximamos pelo tamanho do
- * trecho: a área de texto da folha comporta cerca de 90 caracteres por linha.
+ * ABNT mede a citação em **linhas**: até três, curta; com mais de três, bloco.
+ * A contagem é medida na coluna real da folha (`measureTextLines`) — antes era
+ * estimada por caracteres, e errava sempre que o corpo ou a fonte mudavam.
  */
-const ABNT_BLOCK_CHARS = 3 * 90;
+const ABNT_MAX_INLINE_LINES = 3;
 
 /** APA 7 e Vancouver medem em palavras: a partir de 40, vira bloco. */
 const WORD_BLOCK_COUNT = 40;
@@ -55,7 +64,7 @@ export function cleanExcerpt(raw: string): string {
 }
 
 function isBlockQuote(text: string, style: CitationStyle): boolean {
-  if (style === "abnt") return text.length > ABNT_BLOCK_CHARS;
+  if (style === "abnt") return measureTextLines(text) > ABNT_MAX_INLINE_LINES;
   return text.split(/\s+/).length >= WORD_BLOCK_COUNT;
 }
 

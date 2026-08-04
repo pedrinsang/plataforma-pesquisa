@@ -1,17 +1,15 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { type Editor, useEditorState } from "@tiptap/react";
 import {
+  DEFAULT_MARGINS,
   PAGE_WIDTH_PX,
-  PAGE_MARGIN_PX,
   PX_PER_CM,
   RULER_HEIGHT_PX,
+  pageGeometry,
+  type PageMargins,
 } from "@/lib/writing/page-metrics";
-
-const CONTENT_LEFT = PAGE_MARGIN_PX;
-const CONTENT_RIGHT = PAGE_WIDTH_PX - PAGE_MARGIN_PX;
-const CONTENT_WIDTH = CONTENT_RIGHT - CONTENT_LEFT;
 
 type Marker = "left" | "right" | "firstLine";
 
@@ -25,11 +23,14 @@ export function RulerBand({
   zoom,
   scrollLeft,
   gutter,
+  margins = DEFAULT_MARGINS,
 }: {
   editor: Editor;
   zoom: number;
   scrollLeft: number;
   gutter: number;
+  /** As mesmas margens da folha — a régua tem de sombrear exatamente elas. */
+  margins?: PageMargins;
 }) {
   return (
     <div className="fx-rulerband" style={{ height: RULER_HEIGHT_PX * zoom, paddingRight: gutter }}>
@@ -47,7 +48,7 @@ export function RulerBand({
             transformOrigin: "top left",
           }}
         >
-          <WritingRuler editor={editor} />
+          <WritingRuler editor={editor} margins={margins} />
         </div>
       </div>
     </div>
@@ -71,9 +72,25 @@ function currentIndents(editor: Editor) {
  * primeira linha) que editam o parágrafo selecionado via `setParagraphIndent`.
  * Renderizada dentro do `folium-zoom`, então compartilha a escala do zoom.
  */
-export function WritingRuler({ editor }: { editor: Editor }) {
+export function WritingRuler({
+  editor,
+  margins = DEFAULT_MARGINS,
+}: {
+  editor: Editor;
+  margins?: PageMargins;
+}) {
   const rootRef = useRef<HTMLDivElement>(null);
   const dragging = useRef<Marker | null>(null);
+
+  // A área de conteúdo vem das margens do documento — com margens
+  // assimétricas (ABNT: 3 cm à esquerda, 2 cm à direita) não dá para derivar a
+  // direita espelhando a esquerda. Memoizado pelos números, não pelo objeto:
+  // `box` entra nas dependências do arraste dos marcadores.
+  const { top: mt, right: mr, bottom: mb, left: ml } = margins;
+  const box = useMemo(() => {
+    const geo = pageGeometry({ top: mt, right: mr, bottom: mb, left: ml });
+    return { left: geo.left, right: PAGE_WIDTH_PX - geo.right, width: geo.contentWidth };
+  }, [mt, mr, mb, ml]);
 
   const { indentLeft, indentRight, firstLine } = useEditorState({
     editor,
@@ -97,17 +114,17 @@ export function WritingRuler({ editor }: { editor: Editor }) {
       const x = pointerToPageX(e.clientX);
       const cur = currentIndents(editor);
       if (dragging.current === "left") {
-        const next = clamp(x - CONTENT_LEFT, 0, CONTENT_WIDTH - cur.indentRight);
+        const next = clamp(x - box.left, 0, box.width - cur.indentRight);
         editor.commands.setParagraphIndent({ indentLeft: next });
       } else if (dragging.current === "right") {
-        const next = clamp(CONTENT_RIGHT - x, 0, CONTENT_WIDTH - cur.indentLeft);
+        const next = clamp(box.right - x, 0, box.width - cur.indentLeft);
         editor.commands.setParagraphIndent({ indentRight: next });
       } else {
         // Primeira linha: relativa ao recuo esquerdo (pode ser negativa).
         const next = clamp(
-          x - CONTENT_LEFT - cur.indentLeft,
+          x - box.left - cur.indentLeft,
           -cur.indentLeft,
-          CONTENT_WIDTH - cur.indentLeft - cur.indentRight,
+          box.width - cur.indentLeft - cur.indentRight,
         );
         editor.commands.setParagraphIndent({ firstLine: next });
       }
@@ -123,7 +140,7 @@ export function WritingRuler({ editor }: { editor: Editor }) {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
     };
-  }, [editor]);
+  }, [editor, box]);
 
   function onPointerDown(marker: Marker, e: React.PointerEvent) {
     e.preventDefault();
@@ -132,20 +149,20 @@ export function WritingRuler({ editor }: { editor: Editor }) {
 
   // Marcas de centímetro (relativas à margem esquerda, como no Word).
   const ticks: Array<{ x: number; major: boolean; label: number | null }> = [];
-  for (let x = CONTENT_LEFT; x <= PAGE_WIDTH_PX + 0.5; x += PX_PER_CM / 2) {
-    const cm = Math.round((x - CONTENT_LEFT) / PX_PER_CM);
-    const major = Math.abs(x - (CONTENT_LEFT + cm * PX_PER_CM)) < 0.5;
+  for (let x = box.left; x <= PAGE_WIDTH_PX + 0.5; x += PX_PER_CM / 2) {
+    const cm = Math.round((x - box.left) / PX_PER_CM);
+    const major = Math.abs(x - (box.left + cm * PX_PER_CM)) < 0.5;
     ticks.push({ x, major, label: major && cm > 0 ? cm : null });
   }
-  for (let x = CONTENT_LEFT - PX_PER_CM / 2; x >= -0.5; x -= PX_PER_CM / 2) {
-    const cm = Math.round((CONTENT_LEFT - x) / PX_PER_CM);
-    const major = Math.abs(x - (CONTENT_LEFT - cm * PX_PER_CM)) < 0.5;
+  for (let x = box.left - PX_PER_CM / 2; x >= -0.5; x -= PX_PER_CM / 2) {
+    const cm = Math.round((box.left - x) / PX_PER_CM);
+    const major = Math.abs(x - (box.left - cm * PX_PER_CM)) < 0.5;
     ticks.push({ x, major, label: major && cm > 0 ? cm : null });
   }
 
-  const leftX = CONTENT_LEFT + indentLeft;
-  const rightX = CONTENT_RIGHT - indentRight;
-  const firstX = CONTENT_LEFT + indentLeft + firstLine;
+  const leftX = box.left + indentLeft;
+  const rightX = box.right - indentRight;
+  const firstX = box.left + indentLeft + firstLine;
 
   return (
     <div
@@ -156,7 +173,7 @@ export function WritingRuler({ editor }: { editor: Editor }) {
       {/* Área de conteúdo (entre margens) destacada */}
       <div
         className="folium-ruler-content"
-        style={{ left: CONTENT_LEFT, width: CONTENT_WIDTH }}
+        style={{ left: box.left, width: box.width }}
       />
 
       {/* Marcas de cm */}

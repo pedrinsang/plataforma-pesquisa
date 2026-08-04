@@ -517,12 +517,37 @@ textarea.input { min-height: 90px; resize: vertical; }
 }
 .folium-editor > * { flex: 0 0 auto; }
 
-/* Corpo padrão da folha em **pontos**, não no 1,125rem do `prose-lg`.
-   A folha é A4 a 96 dpi (as mesmas medidas do Word), então 12 pt aqui é o
-   mesmo 12 pt de lá: o texto sem tamanho explícito já nasce no corpo que a
-   maioria dos editais exige, e a caixa de tamanho da faixa mostra "12".
-   Os títulos continuam em `em` do `prose`, então acompanham proporcionalmente. */
-.folium-editor { font-size: 12pt; }
+/* Fonte padrão da folha: **Arial 12 pt** — o que os editais e os manuais de
+   normalização pedem. O corpo é em **pontos**, não no 1,125rem do `prose-lg`:
+   a folha é A4 a 96 dpi (as mesmas medidas do Word), então 12 pt aqui é o
+   mesmo 12 pt de lá, e a caixa de tamanho da faixa mostra "12".
+   O padrão vive aqui, no CSS, e **não** como atributo em cada parágrafo: texto
+   sem `fontFamily`/`fontSize` gravado acompanha o padrão se ele mudar, e a
+   faixa resolve o que está valendo (`lib/writing/cursor-format.ts`).
+   Espelhado em `SHEET_FONT_FAMILY`/`BASE_FONT_PT` (`lib/writing/typography.ts`). */
+.folium-editor {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12pt;
+}
+
+/* Escala dos títulos em pt, de processador de texto. O `prose` os dá em `em`
+   (2,67em no h1 = 32 pt), que é desenho de página web e não de folha A4 — e,
+   por ser `em`, nenhum número redondo aparecia na caixa de tamanho da faixa.
+   Estes valores são o **espelho** de `HEADING_PT` em `lib/writing/typography.ts`:
+   mudar aqui sem mudar lá faz a leitura no cursor mentir. */
+.folium-editor h1 { font-size: 16pt; }
+.folium-editor h2 { font-size: 14pt; }
+.folium-editor h3 { font-size: 13pt; }
+.folium-editor h4 { font-size: 12pt; }
+/* Os títulos herdam a fonte do documento — a regra `h1…h6` da base do app
+   carimba a Cormorant em todo título da interface, e dentro da folha quem manda
+   é a fonte padrão do documento (é ela que a faixa mostra no cursor). */
+.folium-editor h1,
+.folium-editor h2,
+.folium-editor h3,
+.folium-editor h4,
+.folium-editor h5,
+.folium-editor h6 { font-family: inherit; letter-spacing: normal; }
 /* imagens não devem esticar na transversal do flex — mantêm o tamanho e centram */
 .folium-editor > img { align-self: center; }
 
@@ -534,6 +559,17 @@ textarea.input { min-height: 90px; resize: vertical; }
    como o padrão do Word. Em `pt` de propósito — é medida de papel e não muda
    quando o usuário troca o tamanho da fonte.
    O estilo inline do `foliumParagraphSpacing` continua vencendo, por ser inline. */
+/* Entrelinha do corpo, vinda da configuração de página do documento — a ABNT
+   NBR 14724:2024 pede 1,5 no texto (e simples nas citações longas, notas e
+   referências, que já têm entrelinha própria por parágrafo).
+   Aplicada aos blocos de texto e não ao container, para não esticar título,
+   tabela nem imagem. Sem a variável, vale o `leading-relaxed` do prose, que é
+   como o editor sempre desenhou. O atributo `lineHeight` do parágrafo continua
+   vencendo: é estilo inline. */
+.folium-editor p,
+.folium-editor li,
+.folium-editor blockquote { line-height: var(--folium-line-height, 1.625); }
+
 .folium-editor > * { margin-top: 0; margin-bottom: 8pt; }
 .folium-editor > :first-child { margin-top: 0; }
 .folium-editor > h1,
@@ -1223,6 +1259,9 @@ textarea.input { min-height: 90px; resize: vertical; }
   white-space: nowrap;
 }
 .fx-status-sep { width: 1px; height: 11px; flex: none; background: rgba(236, 234, 231, 0.16); }
+/* leitura da formatação no cursor: cede espaço antes das contagens em telas
+   estreitas, em vez de empurrar o zoom para fora da barra */
+.fx-status-format { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .fx-status button { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .fx-status button:hover { color: var(--color-text); }
 .fx-meter {
@@ -1398,7 +1437,8 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* cabeçalho/rodapé por página — tinta de papel (a folha é sempre clara) */
 .folium-hf {
   position: absolute;
-  font-family: var(--font-lora), Georgia, serif;
+  /* mesma fonte do texto da folha — cabeçalho e rodapé são parte do documento */
+  font-family: Arial, Helvetica, sans-serif;
   font-size: 12px;
   line-height: 1.2;
   color: #6b6a66;
@@ -1535,6 +1575,24 @@ textarea.input { min-height: 90px; resize: vertical; }
 @media print {
   .folium-citation { border-bottom: 0 !important; color: inherit !important; }
 }
+
+/* ── lista de referências gerada ─────────────────────────────────────────
+   A seção que o botão "Bibliografia" (faixa Referências) escreve no fim do
+   documento. É um nó só por fora — para poder ser refeita no lugar — e
+   parágrafos comuns por dentro; a forma de cada entrada (recuo deslocado,
+   entrelinha, espaço entre entradas) vem da norma e é gravada como atributo do
+   parágrafo, então o estilo inline sempre vence estas regras.
+
+   `display: flex` pelo mesmo motivo do `.folium-editor`: em contexto flex as
+   margens **não colapsam**, e a medição da paginação não oscila quando um
+   espaçador entra ou sai do meio da lista. */
+.folium-editor .folium-bibliography {
+  display: flex;
+  flex-direction: column;
+}
+.folium-editor > .folium-bibliography { margin-top: 4pt; }
+.folium-editor .folium-bibliography > * { margin-top: 0; margin-bottom: 8pt; }
+.folium-editor .folium-bibliography > .folium-page-spacer { margin: 0; }
 
 /* ══════════════════════  impressão / exportar PDF  ══════════════════════
    "Imprimir" e "Baixar PDF" saem **só a folha**, e exatamente como está na tela:

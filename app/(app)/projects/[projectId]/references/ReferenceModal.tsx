@@ -420,6 +420,121 @@ export function ReferenceModal({
           </label>
         </div>
 
+        {/* Elementos que a ABNT NBR 6023:2018 exige e que as APIs bibliográficas
+            raramente trazem. O local é **essencial** em livro, tese e evento —
+            sem ele a referência sai como "[S. l.]". Os campos aparecem conforme
+            o tipo, senão o formulário viraria uma parede de caixas vazias. */}
+        <div className="grid gap-3 sm:grid-cols-4">
+          <label className="block">
+            <span className="mb-1 block text-[11.5px] text-text-dim">Local</span>
+            <input
+              className="input !py-1.5 !text-[14px]"
+              value={draft.place ?? ""}
+              onChange={(e) => set("place", e.target.value || null)}
+              placeholder="São Paulo"
+              disabled={busy}
+            />
+          </label>
+
+          {(draft.refType === "book" ||
+            draft.refType === "chapter" ||
+            draft.refType === "report") && (
+            <label className="block">
+              <span className="mb-1 block text-[11.5px] text-text-dim">Edição</span>
+              <input
+                className="input !py-1.5 !text-[14px]"
+                value={draft.edition ?? ""}
+                onChange={(e) => set("edition", e.target.value || null)}
+                placeholder="4. ed."
+                disabled={busy}
+              />
+            </label>
+          )}
+
+          {(draft.refType === "article" || draft.refType === "preprint") && (
+            <label className="block">
+              <span className="mb-1 block text-[11.5px] text-text-dim">Mês / período</span>
+              <input
+                className="input !py-1.5 !text-[14px]"
+                value={draft.issuedMonth ?? ""}
+                onChange={(e) => set("issuedMonth", e.target.value || null)}
+                placeholder="jul./dez."
+                disabled={busy}
+              />
+            </label>
+          )}
+
+          {draft.refType === "conference" && (
+            <label className="block">
+              <span className="mb-1 block text-[11.5px] text-text-dim">Nº do evento</span>
+              <input
+                className="input !py-1.5 !text-[14px]"
+                value={draft.eventNumber ?? ""}
+                onChange={(e) => set("eventNumber", e.target.value || null)}
+                placeholder="6"
+                disabled={busy}
+              />
+            </label>
+          )}
+
+          {/* Só quando não há ano certo: a 6023 pede uma aproximação entre
+              colchetes, e não admite "[s.d.]". */}
+          {draft.year === null && (
+            <label className="block">
+              <span className="mb-1 block text-[11.5px] text-text-dim">Ano aproximado</span>
+              <input
+                className="input !py-1.5 !text-[14px]"
+                value={draft.yearText ?? ""}
+                onChange={(e) => set("yearText", e.target.value || null)}
+                placeholder="2010? · ca. 2005 · 200-"
+                disabled={busy}
+              />
+            </label>
+          )}
+        </div>
+
+        {draft.refType === "thesis" && (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="block">
+              <span className="mb-1 block text-[11.5px] text-text-dim">Grau</span>
+              <input
+                className="input !py-1.5 !text-[14px]"
+                value={draft.degree ?? ""}
+                onChange={(e) => set("degree", e.target.value || null)}
+                placeholder="Doutorado · Mestrado"
+                disabled={busy}
+                list="folium-degrees"
+              />
+              <datalist id="folium-degrees">
+                <option value="Doutorado" />
+                <option value="Mestrado" />
+                <option value="Especialização" />
+                <option value="Graduação" />
+              </datalist>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11.5px] text-text-dim">Curso</span>
+              <input
+                className="input !py-1.5 !text-[14px]"
+                value={draft.program ?? ""}
+                onChange={(e) => set("program", e.target.value || null)}
+                placeholder="Economia"
+                disabled={busy}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11.5px] text-text-dim">Instituição</span>
+              <input
+                className="input !py-1.5 !text-[14px]"
+                value={draft.institution ?? ""}
+                onChange={(e) => set("institution", e.target.value || null)}
+                placeholder="Universidade Federal do Ceará"
+                disabled={busy}
+              />
+            </label>
+          </div>
+        )}
+
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="mb-1 block text-[11.5px] text-text-dim">DOI</span>

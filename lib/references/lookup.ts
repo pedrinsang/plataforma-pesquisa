@@ -1,6 +1,7 @@
 import type { Json, ReferenceType } from "@/lib/types/database";
 import { emptyDraft, type ReferenceDraft } from "./types";
 import { identify, normalizeDoi, type Identifier } from "./identify";
+import { abntMonth } from "./format";
 import { safeGet, UnsafeUrlError } from "./safe-fetch";
 
 // Importação de metadados SEM IA. Todo dado vem de APIs bibliográficas
@@ -87,6 +88,9 @@ type CrossrefWork = {
   ISSN?: string[];
   ISBN?: string[];
   subtype?: string;
+  "publisher-location"?: string;
+  institution?: { name?: string }[];
+  event?: { name?: string; location?: string; number?: string };
 };
 
 const CROSSREF_TYPE: Record<string, ReferenceType> = {
@@ -119,10 +123,23 @@ export function formatAuthors(list: CrossrefAuthor[] | undefined): string | null
   return names.length ? names.join("; ") : null;
 }
 
+function dateParts(work: CrossrefWork): number[] | undefined {
+  return work.issued?.["date-parts"]?.[0] ?? work.published?.["date-parts"]?.[0];
+}
+
 function yearFromParts(work: CrossrefWork): number | null {
-  const parts = work.issued?.["date-parts"]?.[0] ?? work.published?.["date-parts"]?.[0];
-  const y = parts?.[0];
+  const y = dateParts(work)?.[0];
   return typeof y === "number" && y > 1000 ? y : null;
+}
+
+/**
+ * Mês do fascículo já na abreviatura da 6023 ("jul.", "maio"). O Crossref
+ * devolve o mês como número em `date-parts`; a ABNT quer a abreviatura em
+ * português, e é ela que fecha a referência de artigo de periódico.
+ */
+function monthFromParts(work: CrossrefWork): string | null {
+  const m = dateParts(work)?.[1];
+  return typeof m === "number" ? abntMonth(m) : null;
 }
 
 function crossrefToDraft(work: CrossrefWork): ReferenceDraft {
@@ -141,6 +158,12 @@ function crossrefToDraft(work: CrossrefWork): ReferenceDraft {
     issue: clean(work.issue),
     pages: clean(work.page),
     edition: clean(work.edition),
+    // Elementos essenciais da ABNT que o Crossref traz mas ninguém usava:
+    // local de publicação (ou o do evento) e o mês do fascículo.
+    place: clean(work["publisher-location"]) ?? clean(work.event?.location),
+    issuedMonth: monthFromParts(work),
+    institution: clean(work.institution?.[0]?.name),
+    eventNumber: clean(work.event?.number),
     abstract: stripJats(work.abstract),
     issn: work.ISSN?.[0] ?? null,
     isbn: work.ISBN?.[0] ?? null,
@@ -170,7 +193,7 @@ export async function searchCrossref(query: string, rows = 8): Promise<Reference
   if (q.length < 4) return [];
   const url =
     `https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(q)}` +
-    `&rows=${rows}&select=DOI,title,author,issued,container-title,type,volume,issue,page,publisher,URL,ISSN,abstract` +
+    `&rows=${rows}&select=DOI,title,author,issued,container-title,type,volume,issue,page,publisher,publisher-location,event,URL,ISSN,abstract` +
     `&mailto=${encodeURIComponent(CONTACT)}`;
   const res = await safeGet(url, { accept: "application/json" });
   if (!res) return [];
@@ -280,6 +303,7 @@ type OpenLibraryBook = {
   subtitle?: string;
   authors?: { name?: string }[];
   publishers?: { name?: string }[];
+  publish_places?: { name?: string }[];
   publish_date?: string;
   number_of_pages?: number;
   url?: string;
@@ -309,6 +333,8 @@ async function fromIsbn(isbn: string): Promise<ReferenceDraft | null> {
     authors: book.authors?.map((a) => a.name).filter(Boolean).join("; ") || null,
     year: firstYear(book.publish_date),
     publisher: clean(book.publishers?.[0]?.name),
+    // Local de publicação: elemento essencial da 6023 para livro.
+    place: clean(book.publish_places?.[0]?.name),
     pages: book.number_of_pages ? String(book.number_of_pages) : null,
     isbn,
     url: book.url ?? null,

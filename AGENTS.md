@@ -153,9 +153,59 @@ não dependemos do CORS do Storage nem entregamos a URL assinada ao cliente.
 Link/DOI externo continua em `<iframe>` — é outra origem, a seleção não é
 legível, e o rodapé do leitor diz isso em vez de deixar o usuário tentando.
 
+Feito também: **bibliografia gerada** no documento. O botão "Bibliografia" da
+faixa Referências abre um painel com dois escopos — **obras citadas no texto**
+(lidas dos nós de citação, na ordem em que aparecem) ou **a biblioteca inteira do
+projeto** — e escreve a lista no fim do documento
+(`lib/writing/bibliography.ts` monta, `extensions/bibliography.ts` é o nó). A
+lista é **gerada, não viva**: por fora é um nó só (`bibliography`), para o botão
+poder reescrevê-la **no lugar** em vez de empilhar uma cópia a cada clique; por
+dentro são parágrafos comuns, editáveis à mão e — o ponto que decidiu o desenho —
+repartíveis pela paginação (`bibliography` entrou em `SPLITTABLE` no
+`WritingCanvas`). Um nó atômico com o texto calculado atravessaria a virada, e
+uma lista de referências passa de uma folha com facilidade. A forma de cada
+entrada sai da norma e vira atributo do parágrafo: ABNT alinhada à esquerda com
+entrelinha simples e branco entre entradas; APA com recuo deslocado de 1,27 cm e
+entrelinha dupla; Vancouver simples, na ordem de citação e **sem número** (a
+chamada no texto ainda é autor-data — numerar aqui criaria um número que não
+corresponde a nada). Trocar a norma no painel Referências reescreve as citações
+**e** refaz a lista, senão o documento ficaria com a chamada em APA e a entrada
+em ABNT. O título ("REFERÊNCIAS") entra como título de primeiro nível **fora** do
+nó: assim vale o "manter com o próximo" (`KEEP_WITH_NEXT`), ele aparece no
+sumário e quem quiser pode reescrevê-lo sem perder o vínculo da lista.
+
+Feito também: **conformidade real com as normas**. O texto das NBR é vendido pela
+ABNT, então as regras foram levantadas dos manuais de normalização que as
+bibliotecas universitárias publicam de graça (UFV 2025, UFC 2020) — que é também
+o que a banca de fato cobra, já que cada instituição escreve o seu por cima da
+norma. O levantamento está em `docs/normas-abnt.md`, com a fonte de cada regra.
+Edições vigentes: **6023:2018** (referências), **10520:2023** (citações),
+**14724:2024** (apresentação). Três achados mudaram código: a 10520 **acabou com
+a caixa alta** na chamada em 2023 (`(Silva, 2019)`, não `(SILVA, 2019)`) — a
+caixa alta continua na lista, que é da 6023 e não foi revisada; a 14724 pede
+margens **assimétricas** (3 cm em cima e à esquerda, 2 cm embaixo e à direita) e
+entrelinha 1,5, e a folha era 2,5 cm fixo nos quatro lados; e a 6023 exige
+**destaque tipográfico** num elemento por tipo de documento — o título no livro,
+o **periódico** no artigo. Por causa do destaque, `formatReference` deixou de ser
+a função principal: quem manda é `formatReferenceSpans`, que devolve trechos
+marcados (`RefSpan[]`) e vira negrito/itálico de verdade na lista; a versão em
+texto puro continua para prévia e busca. O corte entre citação curta e longa
+deixou de ser o chute de "3 × 90 caracteres" e passa por `lib/writing/line-metrics.ts`,
+que mede as linhas no canvas com a fonte real da folha lida do `.folium-editor`.
+As margens deixaram de ser constante: `pageGeometry(margins)` é a fonte única
+para a medição da paginação **e** para o desenho — se as duas divergirem, o papel
+sai diferente da tela —, e a UI é o botão "Margens" da faixa Layout
+(`PageSetupControl`), com predefinição ABNT. A entrelinha é uma variável CSS
+(`--folium-line-height`) posta no shell, e é **nula por padrão** de propósito:
+gravar um número mudaria a altura de cada parágrafo de todo documento já escrito
+e, como a paginação é medida, mudaria onde cada página vira. Os modelos de
+referência têm teste contra os exemplos **literais** do guia da UFC
+(`npm test` → `scripts/test-references.mjs`, no test runner do Node, sem
+framework novo): divergiu um caractere, quebrou.
+
 Falta (do brief): feed de atividade (pode vir do `audit_log`), status do
-projeto, **bibliografia gerada** no documento a partir dos nós de citação
-("Nova" e "Bibliografia" na faixa Referências seguem desabilitados) e vínculo de
+projeto, cadastro de referência de dentro do editor ("Nova", na faixa
+Referências, segue desabilitado), vínculo de
 referência a casos/achados, histórico de versões do texto, bloco de
 ideias/kanban, **gráficos** (nenhuma lib instalada — o node `statChart` já prevê
 `statType: 'chart'` para quando existir), importação CSV/Excel, **campos
@@ -167,6 +217,12 @@ bucket `writing-images` (migration `20260727120000`; rodar `npx supabase db push
 Cabeçalho/rodapé precisam da migration `20260728120000_document_header_footer`
 (colunas `header_text`/`footer_text` em `documents`) — **rodar `npx supabase db
 push`**; até lá a busca é tolerante (campos vazios, editor não quebra).
+Duas migrations novas da conformidade ABNT também esperam `npx supabase db push`:
+`20260806120000_reference_abnt_fields` (colunas `place`, `institution`, `degree`,
+`program`, `issued_month`, `year_text`, `event_number` em `project_references`) e
+`20260806130000_document_page_setup` (margens e `line_height` em `documents`). A
+segunda é tolerante como a do cabeçalho; a **primeira não** — o `select` da aba
+Referências lista as colunas por nome e falha enquanto elas não existirem.
 A paginação é **medida no cliente** (não é do ProseMirror): `WritingCanvas` lê a
 geometria e manda espaçadores para a extensão `foliumPagination`, que os desenha
 como widget decorations. São **dois tipos** de espaçador (`PageSpacer.inline`):
@@ -225,6 +281,23 @@ padrão de `.folium-editor` é **12 pt** — o "12" que os editais pedem, e não
 a contagem de páginas não batia com a do Word. Documentos antigos guardaram px;
 `fontSizeToPt` converte na leitura, então a caixa da faixa mostra o corpo real.
 Espaçamento de parágrafo e recuo de citação já vinham em pt/cm.
+A fonte padrão da folha é **Arial 12** (`SHEET_FONT_FAMILY`), títulos inclusive —
+é o que os editais e a 14724 pedem, e trocar a fonte padrão num processador de
+texto vale para o documento inteiro (por isso o `prose-headings:font-serif` saiu
+do editor e `.folium-editor h1…h6` herda a família; a Cormorant continua na
+lista de fontes). O padrão vive no **CSS**, não como atributo em cada parágrafo:
+texto sem `fontFamily`/`fontSize` gravado acompanha o padrão se ele mudar, e
+documentos antigos não precisam ser reescritos. Os títulos ganharam escala de
+processador de texto (16/14/13/12 pt, `HEADING_PT`) — o `prose` os dava em `em`
+(32 pt no h1), que é desenho de página web e não de folha A4. Os valores em pt
+do `globals.css` e o `HEADING_PT` são **espelhos**: divergir faz a leitura no
+cursor mentir. Essa leitura é o outro lado da mudança
+(`lib/writing/cursor-format.ts`): a faixa e a barra de status mostram o que está
+valendo **no cursor** — família e corpo resolvidos (o explícito quando existe,
+senão o padrão daquele bloco), estilo do bloco, alinhamento, entrelinha e
+espaçamento (`CursorFormatReadout`, na barra de status, visível em qualquer aba
+da faixa). Antes a caixa da faixa caía num literal: dizia "Lora 12" dentro de um
+título, que é outra fonte e outro corpo.
 No editor em tela cheia, "Baixar PDF" e
 "Imprimir" são o mesmo `window.print()`, e o papel sai **igual à tela**: no
 `beforeprint` o `WritingCanvas` monta a **via de impressão** (`.folium-print`) —

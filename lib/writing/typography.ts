@@ -16,6 +16,32 @@ export const PX_PER_PT = 96 / 72;
 export const BASE_FONT_PT = 12;
 
 /**
+ * Família padrão da folha. "Arial 12" é o que a maioria dos editais e manuais de
+ * normalização pede, então é assim que o documento **nasce** — sem nenhuma marca
+ * gravada no texto. É um padrão de CSS (`.folium-editor` no `globals.css`), não
+ * um atributo em cada parágrafo, de propósito: texto sem `fontFamily`/`fontSize`
+ * explícito continua acompanhando o padrão se ele mudar, e a caixa da faixa
+ * mostra o que está valendo em vez de um traço.
+ */
+export const SHEET_FONT_FAMILY = "Arial, Helvetica, sans-serif";
+/** Nome do padrão, para a faixa e a barra de status. */
+export const SHEET_FONT_LABEL = "Arial";
+
+/**
+ * Corpo dos títulos, em pt — **espelho** de `.folium-editor h1…h4` no
+ * `globals.css`. Está aqui porque a faixa e a barra de status mostram o corpo
+ * real do trecho sob o cursor: se as duas listas divergirem, a leitura mente.
+ * A escala é a de um processador de texto (o `prose` dava 32 pt no h1, que é
+ * desenho de página web, não de folha A4).
+ */
+export const HEADING_PT: Record<1 | 2 | 3 | 4, number> = { 1: 16, 2: 14, 3: 13, 4: 12 };
+
+/** Corpo que vale num bloco sem tamanho explícito (0 = parágrafo comum). */
+export function blockBasePt(headingLevel: number): number {
+  return HEADING_PT[headingLevel as 1 | 2 | 3 | 4] ?? BASE_FONT_PT;
+}
+
+/**
  * Tamanhos da caixa de tamanho, os mesmos da lista do Word. O campo continua
  * aceitando qualquer valor digitado.
  */
