@@ -550,6 +550,22 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* o espaçador da paginação é vão puro: margem nenhuma, senão a medição oscila */
 .folium-editor > .folium-page-spacer { margin: 0; }
 
+/* Listas no ritmo do documento. O `prose` trata cada item como um bloco de
+   texto: dá 0,75em de margem em cima *e* embaixo do parágrafo de dentro do item
+   e mais 0,5em ao próprio item, o que abria ~21 px entre tópicos — quase o
+   triplo dos 8 pt que separam dois parágrafos do corpo, e a lista saltava aos
+   olhos como se fosse outro documento. Aqui o vão entre itens é de um lado só e
+   na escala do papel: 4 pt entre tópicos, os 8 pt do bloco ficam depois da lista
+   (regra acima). Sublista encosta no item que a abre. */
+.folium-editor li > p { margin-top: 0; margin-bottom: 0; }
+.folium-editor li { margin-top: 0; margin-bottom: 4pt; }
+.folium-editor li:last-child { margin-bottom: 0; }
+.folium-editor li > ul,
+.folium-editor li > ol { margin-top: 4pt; margin-bottom: 0; }
+/* Item com mais de um parágrafo continua sendo um item: os parágrafos de dentro
+   se separam entre si com o mesmo respiro dos tópicos. */
+.folium-editor li > p ~ p { margin-top: 4pt; }
+
 /* ── chrome do editor em tela cheia ────────────────────────────────────
    Três linhas no topo (documento · abas da faixa · faixa agrupada), régua,
    folha centralizada, trilho de painéis à direita e barra de status embaixo.
@@ -1325,15 +1341,9 @@ textarea.input { min-height: 90px; resize: vertical; }
    `beforeprint`, com uma folha recortada por página (ver @media print). */
 .folium-print { display: none; }
 
-/* overlay de cabeçalho/rodapé/numeração — nas margens, sem capturar cliques */
+/* overlay de cabeçalho e rodapé — nas margens, sem capturar cliques. Não há
+   numeração automática: o número de página é o token `{n}` do rodapé. */
 .folium-page-overlay { position: absolute; inset: 0; pointer-events: none; }
-.folium-page-num {
-  position: absolute; left: 50%; transform: translate(-50%, -50%);
-  padding: 1px 9px; border-radius: 999px;
-  font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 10px; letter-spacing: 0.08em;
-  color: #a3a19b; white-space: nowrap;
-}
 
 /* tabelas */
 .folium-editor .tableWrapper { overflow-x: auto; margin: 1em 0; }
@@ -1533,7 +1543,7 @@ textarea.input { min-height: 90px; resize: vertical; }
    Quem monta o papel é o `WritingCanvas`: no `beforeprint` ele preenche
    `.folium-print` com uma folha A4 por página, cada uma recortando um clone da
    pilha na altura daquela página. Assim a paginação impressa é a **mesma** que
-   foi medida na tela (com cabeçalho, rodapé e numeração no lugar) — o motor de
+   foi medida na tela (com cabeçalho e rodapé no lugar) — o motor de
    impressão não reparte nada, só empurra cada folha para uma página.
 
    As regras `:has()` fazem o caminho da raiz até `.folium-print` continuar

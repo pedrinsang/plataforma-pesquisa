@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { EditorContent, type Editor } from "@tiptap/react";
+import type { Node as PMNode } from "@tiptap/pm/model";
 import {
   CONTENT_HEIGHT_PX,
   CONTENT_WIDTH_PX,
@@ -47,6 +48,13 @@ const SPLITTABLE = new Set(["paragraph", "bulletList", "orderedList", "blockquot
 const SPLITTABLE_IF_TALL = new Set(["heading", "codeBlock"]);
 
 /**
+ * "Manter com o próximo": blocos que não ficam sozinhos no pé da folha. Um
+ * título anuncia o que vem depois — deixá-lo na folha de cima com o texto (ou a
+ * lista) na de baixo é o defeito clássico de quem pagina só por altura.
+ */
+const KEEP_WITH_NEXT = new Set(["heading"]);
+
+/**
  * Quantas passadas de medição uma mesma geometria pode consumir antes de a
  * paginação parar de reescrever o desenho. É uma trava de segurança: a medição
  * deve convergir na segunda passada, e a única forma de gastar isto é um
@@ -66,16 +74,39 @@ function signature(spacers: PageSpacer[]): string {
   return spacers.map((s) => `${s.pos}:${s.inline ? "i" : "b"}:${Math.round(s.height)}`).join("|");
 }
 
-/** Uma linha visual de um bloco, em coordenadas naturais do fluxo. */
+/**
+ * Uma linha visual de um bloco, em coordenadas naturais do fluxo.
+ *
+ * A linha guarda **onde procurar** a posição no documento, não a posição em si:
+ * `posAtCoords` custa cerca de 1 ms por chamada e um documento de 45 páginas tem
+ * mais de mil linhas — resolver todas a cada medição travava a digitação por
+ * segundos. Pontos de virada são um por folha, então a posição é resolvida só
+ * quando a linha vira quebra de verdade (`resolveAnchor`).
+ */
 type Line = {
-  /** Posição no doc onde a linha começa, ou -1 quando não dá para ancorar ali. */
-  pos: number;
   top: number;
   bottom: number;
+  /**
+   * Elemento do parágrafo (textblock) a que a linha pertence. É a unidade de
+   * viúva e órfã: num bloco de vários parágrafos (lista, citação) cada item
+   * conta separado, como num processador de texto. Vem do DOM porque comparar
+   * identidade de elemento é de graça.
+   */
+  block: Element | null;
+  /** A linha abre o parágrafo dela. */
+  opens: boolean;
+  /** Parágrafo imediatamente anterior, dentro do mesmo bloco. */
+  prevBlock: Element | null;
+  /** Ponto na tela por onde achar a posição no doc, se for preciso. */
+  hit: { left: number; top: number };
 };
 
 type Entry = {
   pos: number;
+  /** Fim do nó no doc — delimita as posições válidas dentro dele. */
+  end: number;
+  /** Nome do tipo do nó — quem decide "manter com o próximo". */
+  type: string;
   isBreak: boolean;
   naturalTop: number;
   height: number;
@@ -93,17 +124,13 @@ function readEntries(editor: Editor, zoom: number): Entry[] | null {
   const root = editor.view.dom as HTMLElement;
   const positions: number[] = [];
   const ends: number[] = [];
-  const isBreak: boolean[] = [];
-  const splittable: boolean[] = [];
-  const tallOnly: boolean[] = [];
+  const types: string[] = [];
   let pos = 0;
   editor.state.doc.forEach((node) => {
     positions.push(pos);
     pos += node.nodeSize;
     ends.push(pos);
-    isBreak.push(node.type.name === "pageBreak");
-    splittable.push(SPLITTABLE.has(node.type.name));
-    tallOnly.push(SPLITTABLE_IF_TALL.has(node.type.name));
+    types.push(node.type.name);
   });
 
   const entries: Entry[] = [];
@@ -128,16 +155,18 @@ function readEntries(editor: Editor, zoom: number): Entry[] | null {
     const inner = innerSpacerHeight(child);
     const naturalTop = child.offsetTop - spacerAcc;
     const height = child.offsetHeight - inner;
+    const type = types[index];
     const canSplit =
-      splittable[index] || (tallOnly[index] && height > CONTENT_HEIGHT_PX + EPS);
+      SPLITTABLE.has(type) ||
+      (SPLITTABLE_IF_TALL.has(type) && height > CONTENT_HEIGHT_PX + EPS);
     entries.push({
       pos: positions[index],
-      isBreak: isBreak[index],
+      end: ends[index],
+      type,
+      isBreak: type === "pageBreak",
       naturalTop,
       height,
-      lines: canSplit
-        ? readLines(editor, child, naturalTop, zoom, positions[index], ends[index])
-        : null,
+      lines: canSplit ? readLines(child, naturalTop, zoom) : null,
     });
     spacerAcc += inner;
     index += 1;
@@ -155,26 +184,80 @@ function innerSpacerHeight(block: HTMLElement): number {
 }
 
 /**
- * Mede as linhas visuais de um bloco. `getClientRects` de um `Range` sobre o
- * conteúdo devolve um retângulo por caixa de linha (vários por linha quando há
- * marcas), então os retângulos são agrupados em faixas por sobreposição vertical.
+ * Retângulos das caixas de linha de um bloco, em coordenadas de tela.
+ *
+ * A varredura é pelos **nós de texto**, e não por um `Range` sobre o bloco
+ * inteiro: um Range que atravessa elementos devolve, junto com as linhas, o
+ * retângulo de cada bloco de dentro (o `<li>` da lista, o `<p>` da citação).
+ * Como as faixas são agrupadas pelo ponto médio, esse retângulo engolia todas as
+ * linhas do item numa faixa só — a lista virava uma fila de "linhas" do tamanho
+ * de um item inteiro e nunca partia por dentro. Range sobre nó de texto só
+ * devolve caixa de linha, nunca caixa de elemento.
+ */
+function textLineRects(block: HTMLElement): Array<{ rect: DOMRect; owner: Element | null }> {
+  const walker = document.createTreeWalker(
+    block,
+    NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+  );
+  const range = document.createRange();
+  const out: Array<{ rect: DOMRect; owner: Element | null }> = [];
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      // Dos elementos, só a quebra manual: sem texto nenhum, ela ainda ocupa
+      // uma linha da folha.
+      const el = node as Element;
+      if (el.tagName !== "BR") continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.height > 0) out.push({ rect, owner: el.closest(TEXTBLOCK_SELECTOR) });
+      continue;
+    }
+    if ((node as Text).data === "") continue;
+    const owner = node.parentElement?.closest(TEXTBLOCK_SELECTOR) ?? null;
+    range.selectNodeContents(node);
+    for (const rect of range.getClientRects()) {
+      if (rect.height > 0) out.push({ rect, owner });
+    }
+  }
+  return out;
+}
+
+/**
+ * Os elementos que o ProseMirror desenha para um textblock. Serve para saber, a
+ * partir de um nó de texto, a que parágrafo a linha pertence — sem consultar o
+ * documento, que é a parte cara da medição.
+ */
+const TEXTBLOCK_SELECTOR = "p, h1, h2, h3, h4, h5, h6, pre, td, th, li, blockquote";
+
+/** Posição do textblock que contém `pos` (a posição *antes* dele), ou -1. */
+function textblockStart(doc: PMNode, pos: number): number {
+  const $pos = doc.resolve(pos);
+  for (let depth = $pos.depth; depth > 0; depth -= 1) {
+    if ($pos.node(depth).isTextblock) return $pos.before(depth);
+  }
+  return -1;
+}
+
+/** Última posição de texto dentro do textblock que começa em `start`, ou -1. */
+function textblockEnd(doc: PMNode, start: number): number {
+  const node = doc.nodeAt(start);
+  return node ? start + 1 + node.content.size : -1;
+}
+
+/**
+ * Mede as linhas visuais de um bloco: um retângulo por caixa de linha (vários
+ * por linha quando há marcas), agrupados em faixas.
  *
  * Estes retângulos vêm em coordenadas de tela, **com o zoom aplicado** — por
  * isso todo delta é dividido por `zoom` antes de virar coordenada natural. As
  * faixas que correspondem a um espaçador já aplicado são descontadas, do mesmo
  * jeito que os espaçadores de bloco.
+ *
+ * Cada linha sai sabendo a que parágrafo pertence (o textblock: o item da lista,
+ * o parágrafo da citação) e por onde achar a posição dela no documento, se ela
+ * vier a ser o ponto de virada — ver `Line` e `resolveAnchor`.
  */
-function readLines(
-  editor: Editor,
-  block: HTMLElement,
-  naturalTop: number,
-  zoom: number,
-  from: number,
-  to: number,
-): Line[] | null {
-  const range = document.createRange();
-  range.selectNodeContents(block);
-  const rects = Array.from(range.getClientRects()).filter((r) => r.height > 0);
+function readLines(block: HTMLElement, naturalTop: number, zoom: number): Line[] | null {
+  const rects = textLineRects(block);
   if (rects.length === 0) return null;
 
   const blockTop = block.getBoundingClientRect().top;
@@ -205,8 +288,9 @@ function readLines(
   // inteiro viraria uma faixa só — nenhum ponto de virada, nenhuma quebra.
   // Pelo meio, sobrescrito e corpo continuam na mesma linha e linhas vizinhas
   // continuam separadas.
-  const bands: Array<{ top: number; bottom: number; left: number }> = [];
-  for (const r of rects) {
+  const bands: Array<{ top: number; bottom: number; left: number; owner: Element | null }> =
+    [];
+  for (const { rect: r, owner } of rects) {
     if (insideSpacer(r.top, r.bottom)) continue;
     const last = bands[bands.length - 1];
     const middle = r.top + r.height / 2;
@@ -215,21 +299,56 @@ function readLines(
       last.bottom = Math.max(last.bottom, r.bottom);
       last.left = Math.min(last.left, r.left);
     } else {
-      bands.push({ top: r.top, bottom: r.bottom, left: r.left });
+      bands.push({ top: r.top, bottom: r.bottom, left: r.left, owner });
     }
   }
 
   const lines: Line[] = [];
+  let prevBlock: Element | null = null;
   for (const band of bands) {
     const height = band.bottom - band.top;
     const top = naturalTop + (band.top - blockTop) / zoom - spacerAbove(band.top);
-    // Onde a linha começa no documento. Sem isso não dá para ancorar o vão, e a
-    // linha deixa de ser um ponto de virada válido (fica com `pos: -1`).
-    const hit = editor.view.posAtCoords({ left: band.left + 1, top: band.top + height / 2 });
-    const at = hit && hit.pos > from && hit.pos < to ? hit.pos : -1;
-    lines.push({ pos: at, top, bottom: top + height / zoom });
+    const opens = band.owner !== null && band.owner !== prevBlock;
+    lines.push({
+      top,
+      bottom: top + height / zoom,
+      block: band.owner,
+      opens,
+      prevBlock: opens ? prevBlock : null,
+      hit: { left: band.left + 1, top: band.top + height / 2 },
+    });
+    if (band.owner) prevBlock = band.owner;
   }
   return lines.length > 0 ? lines : null;
+}
+
+/**
+ * Posição no doc onde pendurar o vão que empurra `line` para a folha de baixo,
+ * ou -1 quando não há ponto utilizável.
+ *
+ * Na primeira linha de um parágrafo interno (o item da lista, o parágrafo da
+ * citação) o vão vai para o **fim do parágrafo anterior**. Um vão no começo do
+ * item deixaria o marcador — o "•", o número — na folha de cima e o texto na de
+ * baixo, que era o que estragava a quebra de uma lista.
+ */
+function resolveAnchor(editor: Editor, entry: Entry, line: Line): number {
+  const inside = (pos: number) => pos > entry.pos && pos < entry.end;
+
+  if (line.opens && line.prevBlock) {
+    const doc = editor.state.doc;
+    let at = -1;
+    try {
+      at = editor.view.posAtDOM(line.prevBlock, 0);
+    } catch {
+      at = -1;
+    }
+    const start = at >= 0 ? textblockStart(doc, at) : -1;
+    const end = start >= 0 ? textblockEnd(doc, start) : -1;
+    if (end >= 0 && inside(end)) return end;
+  }
+
+  const hit = editor.view.posAtCoords(line.hit);
+  return hit && inside(hit.pos) ? hit.pos : -1;
 }
 
 /**
@@ -241,7 +360,10 @@ function readLines(
  * Blocos mais altos que uma folha (tabela/imagem grande) não são empurrados — não
  * há para onde —, então seguem atravessando, como num processador de texto.
  */
-function planPages(entries: Entry[]): { spacers: PageSpacer[]; pageCount: number } {
+function planPages(
+  editor: Editor,
+  entries: Entry[],
+): { spacers: PageSpacer[]; pageCount: number } {
   const spacers: PageSpacer[] = [];
   // Vão total já reservado acima do ponto que está sendo examinado. A posição
   // real de qualquer coisa é sempre `natural + offset`, então não é preciso
@@ -250,7 +372,8 @@ function planPages(entries: Entry[]): { spacers: PageSpacer[]; pageCount: number
   let bottom = 0;
   let forceNextPage = false;
 
-  for (const entry of entries) {
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index];
     let top = entry.naturalTop + offset;
     const fitsInOnePage = entry.height <= CONTENT_HEIGHT_PX + EPS;
     const overflows = (at: number) =>
@@ -268,7 +391,7 @@ function planPages(entries: Entry[]): { spacers: PageSpacer[]; pageCount: number
 
     if (overflows(top)) {
       if (entry.lines && entry.lines.length > 1) {
-        offset += splitEntry(entry, offset, spacers);
+        offset += splitEntry(editor, entry, offset, spacers);
       } else if (fitsInOnePage) {
         const push = sheetTop(pageOfFlowY(top) + 1) - top;
         if (push > EPS) {
@@ -278,6 +401,15 @@ function planPages(entries: Entry[]): { spacers: PageSpacer[]; pageCount: number
       }
       // Bloco mais alto que uma folha e sem linhas para repartir (tabela ou
       // imagem grande) segue atravessando: não há para onde empurrar.
+      top = entry.naturalTop + offset;
+    }
+
+    if (KEEP_WITH_NEXT.has(entry.type)) {
+      const push = keepWithNextPush(entries, index, top, offset);
+      if (push > EPS) {
+        spacers.push({ pos: entry.pos, height: push });
+        offset += push;
+      }
     }
 
     bottom = Math.max(bottom, entry.naturalTop + offset + entry.height);
@@ -289,24 +421,101 @@ function planPages(entries: Entry[]): { spacers: PageSpacer[]; pageCount: number
 }
 
 /**
+ * Até onde um bloco precisa caber para **começar** numa folha, e não ser
+ * inteiramente empurrado para a de baixo. Não basta a primeira linha: pelas
+ * regras de viúva e órfã, um parágrafo curto demais para partir desce inteiro,
+ * então o requisito é o mesmo que o `splitEntry` aplica — `MIN_LINES` do
+ * primeiro parágrafo, ou ele todo quando é curto demais para ser repartido.
+ */
+function firstUnitBottom(entry: Entry): number {
+  const lines = entry.lines;
+  if (!lines || lines.length === 0) return entry.naturalTop + entry.height;
+  const [, end] = paraSpan(lines, 0);
+  const needed = end >= MIN_LINES * 2 ? MIN_LINES : end;
+  return lines[Math.min(needed, lines.length) - 1].bottom;
+}
+
+/**
+ * Vão que um bloco "manter com o próximo" precisa para não terminar a folha
+ * sozinho: se a primeira linha do que vem depois dele não cabe na mesma folha,
+ * ele desce junto. Títulos seguidos contam como um bloco só — o teste roda no
+ * primeiro deles, e depois do salto os de baixo já cabem.
+ *
+ * Devolve 0 quando não há nada a fazer, inclusive quando o bloco já está no alto
+ * da folha: aí descer não resolveria nada e ainda queimaria uma página inteira.
+ */
+function keepWithNextPush(
+  entries: Entry[],
+  index: number,
+  top: number,
+  offset: number,
+): number {
+  const page = pageOfFlowY(top);
+  if (top <= sheetTop(page) + EPS) return 0;
+
+  let next = index + 1;
+  while (next < entries.length && KEEP_WITH_NEXT.has(entries[next].type)) next += 1;
+  const after = entries[next];
+  if (!after || after.isBreak) return 0;
+
+  const need = firstUnitBottom(after);
+  if (need - after.naturalTop > CONTENT_HEIGHT_PX) return 0;
+  if (need + offset <= pageContentBottom(page) + EPS) return 0;
+  return sheetTop(page + 1) - top;
+}
+
+/**
+ * Faixa de linhas do parágrafo a que a linha `i` pertence. É a unidade de viúva
+ * e órfã: num bloco de vários parágrafos (a lista, a citação) cada item conta
+ * por si. Sem identidade de parágrafo, o bloco inteiro é o parágrafo.
+ */
+function paraSpan(lines: Line[], i: number): [number, number] {
+  const id = lines[i].block;
+  if (!id) return [0, lines.length];
+  let start = i;
+  let end = i + 1;
+  while (start > 0 && lines[start - 1].block === id) start -= 1;
+  while (end < lines.length && lines[end].block === id) end += 1;
+  return [start, end];
+}
+
+/**
  * Reparte um bloco entre folhas. Percorre as linhas e, na primeira que cruzaria
  * o fim da área de texto, reserva o vão que falta para ela recomeçar no topo da
  * folha seguinte — o parágrafo continua sendo um só nó do documento, o vão é
  * apenas um espaçador em linha desenhado no meio dele.
  *
- * Viúvas e órfãs movem o ponto de virada para cima; quando nem assim dá para
- * deixar `MIN_LINES` dos dois lados, o bloco inteiro desce. Devolve o vão somado.
+ * Viúvas e órfãs são contadas **por parágrafo**: numa lista, o item que não
+ * consegue deixar `MIN_LINES` dos dois lados desce inteiro para a folha de
+ * baixo, em vez de partir na primeira linha. Devolve o vão somado.
  */
-function splitEntry(entry: Entry, offsetIn: number, spacers: PageSpacer[]): number {
+function splitEntry(
+  editor: Editor,
+  entry: Entry,
+  offsetIn: number,
+  spacers: PageSpacer[],
+): number {
   const lines = entry.lines;
   if (!lines) return 0;
 
   let offset = offsetIn;
-  let segStart = 0; // primeira linha da folha corrente
+  let pageStart = 0; // primeira linha da folha corrente
   let i = 0;
   // O laço só avança ou reserva vão, mas a medição é subpixel — a trava evita
   // que um arredondamento infeliz prenda a paginação num laço infinito.
   let guard = lines.length * 4 + 8;
+
+  /** Desce o bloco inteiro; devolve `false` quando não há para onde. */
+  const pushWholeBlock = () => {
+    const blockTop = entry.naturalTop + offset;
+    const push = sheetTop(pageOfFlowY(blockTop) + 1) - blockTop;
+    if (push <= EPS) return false;
+    spacers.push({ pos: entry.pos, height: push });
+    offset += push;
+    i = 0;
+    pageStart = 0;
+    return true;
+  };
 
   while (i < lines.length && guard > 0) {
     guard -= 1;
@@ -316,23 +525,35 @@ function splitEntry(entry: Entry, offsetIn: number, spacers: PageSpacer[]): numb
       continue;
     }
 
-    let at = i;
-    // Viúva: pelo menos MIN_LINES descem junto.
-    if (lines.length - at < MIN_LINES) at = lines.length - MIN_LINES;
-    // Órfã: pelo menos MIN_LINES ficam na folha que termina. Se já houve uma
-    // virada logo acima, não dá para subir mais — parte no ponto original.
-    if (at - segStart < MIN_LINES) at = segStart === 0 ? 0 : i;
-    if (at <= segStart && segStart > 0) at = i;
+    // Viúva e órfã: se a virada não deixa MIN_LINES dos dois lados, o parágrafo
+    // inteiro desce (é o que o Word faz com um item curto no pé da folha).
+    const [paraStart, paraEnd] = paraSpan(lines, i);
+    let at = i - paraStart < MIN_LINES || paraEnd - i < MIN_LINES ? paraStart : i;
 
-    if (at <= 0 || lines[at].pos < 0) {
-      // Sem ponto de virada utilizável dentro do bloco: desce ele inteiro.
-      const blockTop = entry.naturalTop + offset;
-      const push = sheetTop(pageOfFlowY(blockTop) + 1) - blockTop;
-      if (push <= EPS) break;
-      spacers.push({ pos: entry.pos, height: push });
-      offset += push;
-      i = 0;
-      segStart = 0;
+    // O bloco todo desce só quando a virada é a primeira linha dele e ele ainda
+    // não foi repartido — depois disso não há mais como subir.
+    if (at === 0 && pageStart === 0) {
+      if (pushWholeBlock()) continue;
+      break;
+    }
+    // Um parágrafo mais alto que a folha começa nela e mesmo assim não cabe:
+    // parte onde deu, sem tentar subir.
+    if (at <= pageStart) at = i;
+    if (at <= pageStart) {
+      i += 1;
+      continue;
+    }
+
+    // Onde pendurar o vão — só aqui a posição no doc é resolvida, porque é a
+    // parte cara da medição e isto acontece uma vez por folha.
+    let anchor = resolveAnchor(editor, entry, lines[at]);
+    if (anchor < 0 && at !== i) {
+      at = i;
+      anchor = resolveAnchor(editor, entry, lines[at]);
+    }
+    if (anchor < 0) {
+      if (pageStart === 0 && pushWholeBlock()) continue;
+      i += 1;
       continue;
     }
 
@@ -342,9 +563,9 @@ function splitEntry(entry: Entry, offsetIn: number, spacers: PageSpacer[]): numb
       i += 1;
       continue;
     }
-    spacers.push({ pos: lines[at].pos, height: push, inline: true });
+    spacers.push({ pos: anchor, height: push, inline: true });
     offset += push;
-    segStart = at;
+    pageStart = at;
     i = at + 1;
   }
   return offset - offsetIn;
@@ -426,7 +647,7 @@ export function WritingCanvas({
     if (!editor || editor.isDestroyed) return;
     const entries = readEntries(editor, zoom);
     if (!entries) return;
-    const { spacers, pageCount: next } = planPages(entries);
+    const { spacers, pageCount: next } = planPages(editor, entries);
 
     // O que vale é o que o plugin tem aplicado, não uma cópia nossa: numa
     // edição ele remapeia os espaçadores por conta própria, e comparar com uma
@@ -649,9 +870,13 @@ function resolveTokens(text: string, page: number, total: number): string {
 }
 
 /**
- * Cabeçalho, rodapé e numeração — desenhados nas margens de cada folha, por cima
- * do texto. Agora que a paginação é real, cada um cai na margem certa da sua
- * folha, sem sobrepor parágrafo nenhum.
+ * Cabeçalho e rodapé — desenhados nas margens de cada folha, por cima do texto.
+ * Agora que a paginação é real, cada um cai na margem certa da sua folha, sem
+ * sobrepor parágrafo nenhum.
+ *
+ * Sem numeração automática: quem quiser número de página escreve `{n}` (ou
+ * `{n}/{total}`) no rodapé, e ele sai também no papel. Uma numeração desenhada
+ * por padrão só duplicaria essa função e apareceria em documento que não pediu.
  */
 function PageOverlay({
   pageCount,
@@ -683,7 +908,7 @@ function PageOverlay({
                 {resolveTokens(header, i + 1, pageCount)}
               </div>
             )}
-            {hasFooter ? (
+            {hasFooter && (
               <div
                 className="folium-hf folium-hf-footer"
                 style={{
@@ -693,10 +918,6 @@ function PageOverlay({
                 }}
               >
                 {resolveTokens(footer, i + 1, pageCount)}
-              </div>
-            ) : (
-              <div className="folium-page-num" style={{ top: bottom - PAGE_MARGIN_PX / 2 }}>
-                {i + 1} / {pageCount}
               </div>
             )}
           </div>

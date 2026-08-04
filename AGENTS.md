@@ -110,7 +110,12 @@ com vão real entre elas e **paginação por medição** (`extensions/pagination
 + `planPages` no `WritingCanvas`), e a quebra de página explícita consome o
 resto da folha de verdade. A paginação é **por linha, não por bloco**: um
 parágrafo longo é **repartido entre duas folhas** como num processador de texto,
-com controle de viúvas e órfãs (`MIN_LINES = 2`).
+com controle de viúvas e órfãs (`MIN_LINES = 2`) contado **por parágrafo** — numa
+lista, cada item conta por si, e o item que não consegue deixar duas linhas dos
+dois lados desce inteiro. Títulos têm **"manter com o próximo"**
+(`KEEP_WITH_NEXT`): um título não termina a folha sozinho, desce junto com o
+bloco que ele abre. O rodapé não tem mais numeração automática — quem quer número
+de página escreve `{n}`/`{total}` no rodapé (`HeaderFooterControl`).
 
 Feito também: **biblioteca de referências** (aba própria `references` do projeto:
 qualquer tipo de fonte, PDF anexado em bucket privado, metadados importados de
@@ -168,7 +173,22 @@ um `div` entre blocos, que desce o bloco inteiro, e um `span` da largura da
 coluna **dentro** do parágrafo (`.folium-line-spacer`), que reparte o parágrafo
 sem que ele deixe de ser um único nó do documento. Por isso a medição desce ao
 nível da linha: `readLines` monta as caixas de linha com `Range.getClientRects()`
-e ancora a virada com `view.posAtCoords`. Três coisas seguram isso de pé e não
+e ancora a virada com `view.posAtCoords`. Duas regras vieram das listas e não
+devem ser desfeitas. Primeira: os retângulos saem de um `Range` sobre **cada nó
+de texto** (`textLineRects`), nunca de um `Range` sobre o bloco inteiro — um
+Range que atravessa elementos devolve também a caixa de cada bloco de dentro (o
+`<li>`, o `<p>` da citação), e como as faixas são agrupadas pelo ponto médio essa
+caixa engolia todas as linhas do item numa faixa só: a lista virava uma fila de
+"linhas" do tamanho de um item e nunca partia por dentro. Segunda: quando a
+virada cai na **primeira linha de um parágrafo interno**, o vão vai para o *fim
+do parágrafo anterior* (`resolveAnchor`), e não para o começo do que desce —
+senão o `<li>` fica na folha de cima com o marcador ("•", o número) e o texto vai
+sozinho para a de baixo. A posição no doc é resolvida **só na linha que vira
+quebra**: `posAtCoords` custa ~1 ms e um documento de 45 páginas tem mais de mil
+linhas — resolver todas travava a digitação por segundos (era ~2 s por tecla;
+hoje ~20 ms). Por isso a identidade do parágrafo, usada em toda linha para viúva
+e órfã, vem do DOM (`TEXTBLOCK_SELECTOR` + `closest`), que é de graça.
+Três coisas seguram o resto de pé e também não
 devem ser desfeitas: `.folium-editor` é `display:flex; flex-direction:column`
 (em contexto flex as margens **não colapsam**, senão inserir/remover espaçador
 muda o espaço entre parágrafos e a medição oscila); o agendamento usa
@@ -210,8 +230,7 @@ por `invited_email` no cadastro). No editor em tela cheia, "Baixar PDF" e
 `beforeprint` o `WritingCanvas` monta a **via de impressão** (`.folium-print`) —
 uma folha A4 por página, cada uma recortando (`overflow:hidden`) um clone da
 pilha deslocado pelo topo daquela folha —, e o `afterprint` esvazia. Ou seja, a
-paginação impressa é a **mesma medida na tela**, com cabeçalho/rodapé/numeração
-no lugar; o motor de impressão não reparte nada (`@page margin: 0`, as margens
+paginação impressa é a **mesma medida na tela**, com cabeçalho e rodapé no lugar; o motor de impressão não reparte nada (`@page margin: 0`, as margens
 vêm desenhadas dentro do clone). O `@media print` esconde o resto com `:has()`:
 o que não é o shell nem ancestral dele (sidebar, topbar, abas do projeto) e, dentro
 do shell, tudo que não é `.folium-print` nem ancestral dele (chrome, régua, trilho,
@@ -236,7 +255,14 @@ O espaçamento entre parágrafos é definido em `.folium-editor > *`
 `prose`**: como o editor é `display:flex`, as margens não colapsam e as margens
 do typography somavam dos dois lados — ~48 px de vão a cada Enter. A regra
 `.folium-editor > .folium-page-spacer { margin: 0 }` tem de continuar existindo,
-senão a medição da paginação oscila.
+senão a medição da paginação oscila. As **listas** seguem o mesmo raciocínio: o
+`prose` trata cada item como um bloco de texto (0,75em em cima e embaixo do
+parágrafo de dentro, mais 0,5em no próprio item), o que abria ~21 px entre
+tópicos — quase o triplo dos 8 pt entre dois parágrafos do corpo, e a lista saía
+frouxa como se fosse outro documento. Agora o vão entre itens é de um lado só e
+em medida de papel: `.folium-editor li > p { margin: 0 }` e
+`.folium-editor li { margin-bottom: 4pt }`, com os 8 pt do bloco ficando depois
+da lista inteira.
 
 Os arquivos de referência usam o bucket **privado** `reference-files`
 (migration `20260801120000`), com o `project_id` como primeiro segmento do path
