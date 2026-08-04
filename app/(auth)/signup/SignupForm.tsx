@@ -9,11 +9,12 @@ import { FormMessage } from "@/components/ui/FormMessage";
 
 const initialState: AuthActionState = { error: null };
 
-export function SignupForm() {
+export function SignupForm({ next }: { next?: string }) {
   const [state, formAction, isPending] = useActionState(signUp, initialState);
 
   return (
     <form action={formAction} className="space-y-4">
+      {next && <input type="hidden" name="next" value={next} />}
       <div>
         <Label htmlFor="fullName">Nome completo</Label>
         <Input id="fullName" name="fullName" type="text" required autoComplete="name" />
@@ -39,7 +40,10 @@ export function SignupForm() {
       </Button>
       <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
         Já tem conta?{" "}
-        <Link href="/login" className="font-medium text-accent-teal hover:underline">
+        <Link
+          href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"}
+          className="font-medium text-accent-teal hover:underline"
+        >
           Entrar
         </Link>
       </p>

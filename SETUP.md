@@ -34,6 +34,40 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=     # chave "anon public"
 > O `.env.local` **não** é versionado (contém as chaves). A forma mais fácil
 > é copiar o arquivo do PC principal, ou repegar os valores no painel do Supabase.
 
+### Envio de e-mail dos convites (opcional)
+
+O convite de participante **sempre** gera um link e um código
+(`/convite/XXXX-XXXX-XXXX`). Duas variáveis a mais fazem o convite sair por
+e-mail automaticamente:
+
+```
+RESEND_API_KEY=      # chave em https://resend.com → API Keys
+EMAIL_FROM=          # remetente verificado, ex.: Folium <convites@seudominio.com>
+```
+
+Sem elas nada quebra: a tela mostra o link/código para quem convidou copiar e
+mandar por WhatsApp, e-mail próprio, o que for.
+
+**Atenção ao remetente — é aqui que o envio falha.** O Resend só entrega de um
+endereço que ele reconhece:
+
+- `EMAIL_FROM="Folium <onboarding@resend.dev>"` é o remetente de teste e só
+  entrega **para o e-mail dono da conta Resend**. Qualquer outro destinatário
+  volta com HTTP 403 — o motivo aparece na própria tela do convite e no terminal
+  do servidor (`[convite] envio recusado pelo provedor…`).
+- Para enviar a qualquer pessoa é preciso um **domínio próprio verificado**:
+  painel do Resend → **Domains** → **Add Domain** → cadastrar no DNS do
+  registrador os registros que ele mostrar (SPF e DKIM; o Resend marca
+  "Verified" em minutos). Depois basta trocar a variável — nenhum código muda:
+
+```
+EMAIL_FROM="Folium <convites@seudominio.com>"
+```
+
+Em produção preencha também `NEXT_PUBLIC_SITE_URL` com o domínio publicado, senão
+o link do convite sai apontando para o host da requisição (em desenvolvimento,
+`http://localhost:3000`, que não funciona para quem recebe).
+
 ```bash
 # 4. Rodar em desenvolvimento
 npm run dev          # abre em http://localhost:3000

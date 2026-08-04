@@ -1,6 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
+import { isEmailConfigured } from "@/lib/email/send";
+import { toPendingInvites, type PendingInviteCode } from "@/lib/invites/pending";
+import { getAppUrl } from "@/lib/utils/app-url";
 import { InviteMemberForm } from "./InviteMemberForm";
+import { InviteCodesList } from "./InviteCodesList";
 import { MemberRow } from "./MemberRow";
 
 export async function ParticipantsCard({ projectId }: { projectId: string }) {
@@ -18,8 +22,23 @@ export async function ParticipantsCard({ projectId }: { projectId: string }) {
 
   const me = members?.find((m) => m.user_id === user?.id);
   const isOwner = me?.role === "owner";
-  const canManage = me?.role === "owner" || me?.role === "editor";
+  const canInvite = me?.role === "owner" || me?.role === "editor";
   const visible = (members ?? []).slice(0, 4);
+
+  // Códigos em aberto: só owner/editor enxergam (policy de RLS), e a lista fica
+  // fora do caminho de quem não convida.
+  let invites: PendingInviteCode[] = [];
+  if (canInvite) {
+    const appUrl = await getAppUrl();
+    const { data: rows } = await supabase
+      .from("project_invite_codes")
+      .select("id, code, role, email, max_uses, uses_count, expires_at")
+      .eq("project_id", projectId)
+      .is("revoked_at", null)
+      .order("created_at", { ascending: false });
+
+    invites = toPendingInvites(rows ?? [], appUrl);
+  }
 
   return (
     <Card className="space-y-3">
@@ -62,6 +81,7 @@ export async function ParticipantsCard({ projectId }: { projectId: string }) {
         {members?.map((member) => {
           const displayName =
             member.profiles?.full_name || member.profiles?.email || member.invited_email || "—";
+          const isSelf = member.user_id === user?.id;
           return (
             <MemberRow
               key={member.id}
@@ -70,14 +90,24 @@ export async function ParticipantsCard({ projectId }: { projectId: string }) {
               name={displayName}
               role={member.role}
               pending={member.status === "pending"}
-              canManage={Boolean(canManage) && member.user_id !== user?.id}
-              canManageOwner={isOwner}
+              canChangeRole={Boolean(canInvite) && !isSelf}
+              // excluir participante é decisão de dono (regra também no banco)
+              canRemove={Boolean(isOwner) && !isSelf}
+              canManageOwner={Boolean(isOwner)}
             />
           );
         })}
       </div>
 
-      {canManage && <InviteMemberForm projectId={projectId} canInviteOwner={isOwner} />}
+      {canInvite && (
+        <InviteCodesList
+          invites={invites}
+          projectId={projectId}
+          emailConfigured={isEmailConfigured()}
+        />
+      )}
+
+      {canInvite && <InviteMemberForm projectId={projectId} canInviteOwner={Boolean(isOwner)} />}
     </Card>
   );
 }

@@ -128,6 +128,41 @@ export interface Database {
           },
         ];
       };
+      project_invite_codes: {
+        Row: {
+          id: string;
+          project_id: string;
+          code: string;
+          role: ProjectMemberRole;
+          email: string | null;
+          max_uses: number | null;
+          uses_count: number;
+          expires_at: string | null;
+          revoked_at: string | null;
+          last_used_at: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        // escrita só pelas RPCs (create_project_invite / revoke_project_invite)
+        Insert: never;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "project_invite_codes_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "project_invite_codes_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       documents: {
         Row: {
           id: string;
@@ -584,6 +619,56 @@ export interface Database {
           accepted_at: string | null;
           created_at: string;
         };
+      };
+      create_project_invite: {
+        Args: {
+          p_project_id: string;
+          p_code: string;
+          p_role?: ProjectMemberRole;
+          p_email?: string | null;
+          p_max_uses?: number | null;
+          p_expires_in_days?: number | null;
+        };
+        Returns: {
+          id: string;
+          project_id: string;
+          code: string;
+          role: ProjectMemberRole;
+          email: string | null;
+          max_uses: number | null;
+          uses_count: number;
+          expires_at: string | null;
+          revoked_at: string | null;
+          last_used_at: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+      };
+      revoke_project_invite: {
+        Args: { p_invite_id: string };
+        Returns: void;
+      };
+      preview_project_invite: {
+        Args: { p_code: string };
+        Returns: {
+          status:
+            | "valid"
+            | "not_found"
+            | "revoked"
+            | "expired"
+            | "exhausted"
+            | "wrong_email"
+            | "already_member";
+          project_id: string | null;
+          project_title: string | null;
+          role: ProjectMemberRole | null;
+          invited_email: string | null;
+          inviter_name: string | null;
+        }[];
+      };
+      redeem_project_invite: {
+        Args: { p_code: string };
+        Returns: string;
       };
       accept_project_invite: {
         Args: { p_project_id: string };

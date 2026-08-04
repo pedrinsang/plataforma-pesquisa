@@ -37,7 +37,12 @@ export async function proxy(request: NextRequest) {
 
   if (!user && !isPublicPath && request.nextUrl.pathname !== "/") {
     const redirectUrl = request.nextUrl.clone();
+    // Guarda o destino para voltar depois de entrar — é o que faz o link de
+    // convite (/convite/<código>) sobreviver ao desvio para o login.
+    const target = `${request.nextUrl.pathname}${request.nextUrl.search}`;
     redirectUrl.pathname = "/login";
+    redirectUrl.search = "";
+    redirectUrl.searchParams.set("next", target);
     return NextResponse.redirect(redirectUrl);
   }
 

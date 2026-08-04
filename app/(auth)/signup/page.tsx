@@ -3,7 +3,14 @@ import { Card } from "@/components/ui/Card";
 import { AppMark } from "@/components/layout/AppMark";
 import { SignupForm } from "./SignupForm";
 
-export default function SignupPage() {
+export default async function SignupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const { next } = await searchParams;
+  const safeNext = next && /^\/(?!\/)/.test(next) ? next : undefined;
+
   return (
     <div className="flex min-h-full flex-1 items-center justify-center p-6">
       <div className="w-full max-w-sm">
@@ -20,7 +27,7 @@ export default function SignupPage() {
           Criar conta
         </h1>
         <Card>
-          <SignupForm />
+          <SignupForm next={safeNext} />
         </Card>
       </div>
     </div>

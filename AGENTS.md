@@ -80,7 +80,8 @@ inserida por painel lateral estilo Canva — `components/writing/*`,
 `lib/writing/extensions/*`),
 planilha de dados (react-data-grid), dark/light, **segurança reforçada**
 (RLS por papel, rate limit de login, `audit_log`), **convites de participantes
-com aceite do convidado**, **redesign visual completo — sistema "Folium"**
+funcionando de ponta a ponta** (por e-mail com link ou por código aleatório;
+exclusão de participante restrita ao dono), **redesign visual completo — sistema "Folium"**
 (editorial/petróleo, Cormorant + Lora, claro/escuro), **timeline/marcos**
 (linha do tempo com CRUD e reordenação), **amostras/coleta** (CRUD em
 `statistics/samples`, alimenta o card e o gráfico semanal da visão geral) e
@@ -224,8 +225,7 @@ padrão de `.folium-editor` é **12 pt** — o "12" que os editais pedem, e não
 a contagem de páginas não batia com a do Word. Documentos antigos guardaram px;
 `fontSizeToPt` converte na leitura, então a caixa da faixa mostra o corpo real.
 Espaçamento de parágrafo e recuo de citação já vinham em pt/cm.
-Convites não enviam e-mail (vinculam
-por `invited_email` no cadastro). No editor em tela cheia, "Baixar PDF" e
+No editor em tela cheia, "Baixar PDF" e
 "Imprimir" são o mesmo `window.print()`, e o papel sai **igual à tela**: no
 `beforeprint` o `WritingCanvas` monta a **via de impressão** (`.folium-print`) —
 uma folha A4 por página, cada uma recortando (`overflow:hidden`) um clone da
@@ -249,6 +249,28 @@ anexado entra pelo route handler de URL assinada (sempre embute); link/DOI
 externo entra em `sandbox` e pode ser recusado pelo site (X-Frame-Options) — por
 isso o recado de "abrir em nova aba" fica desenhado **por baixo** do iframe, que
 é transparente de propósito.
+
+**Convites de participantes** (migrations `20260804120000` +
+`20260804130000`): todo convite é uma linha em `project_invite_codes` com um
+**código** de ~59 bits gerado no servidor (`lib/invites/code.ts`, alfabeto sem
+caracteres ambíguos, formato `XXXX-XXXX-XXXX`) que vira o link `/convite/<code>`.
+Dois formatos na mesma tabela — **por e-mail** (`email` preenchido,
+`max_uses = 1`, ainda cria a linha `pending` em `project_members` para o cartão
+"Convites pendentes") e **por código** (`email` nulo, com validade e limite de
+usos opcionais, qualquer pessoa logada entra). RPCs: `create_project_invite`,
+`revoke_project_invite`, `preview_project_invite` (a tela do convite roda antes
+de a pessoa ser membro, então quem responde é SECURITY DEFINER) e
+`redeem_project_invite` (trava a linha com `for update` — o limite de usos vale
+sob concorrência — e nunca **rebaixa** o papel de quem já é membro). Regras de
+papel: owner/editor **convidam**, mas só **dono exclui participante**
+(`remove_project_member` exige `is_project_owner` e recusa auto-exclusão).
+O envio de e-mail é **opcional por design** (`lib/email/send.ts`, Resend via
+`fetch`, sem dependência nova): sem `RESEND_API_KEY`/`EMAIL_FROM` o convite vale
+igual e a interface mostra o link/código para copiar. Toda RPC de convite teve o
+`execute` revogado de `public`/`anon` — o Postgres concede a PUBLIC por padrão, e
+essas funções são SECURITY DEFINER. O desvio para o login preserva o destino
+(`?next=`, saneado contra open redirect no `proxy.ts` e em `lib/actions/auth.ts`),
+para o link do e-mail sobreviver ao cadastro.
 
 O espaçamento entre parágrafos é definido em `.folium-editor > *`
 (8 pt embaixo, 0 em cima; 12 pt antes dos títulos) e **não pode voltar para o

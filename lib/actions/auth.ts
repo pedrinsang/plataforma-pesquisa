@@ -5,6 +5,14 @@ import { createClient } from "@/lib/supabase/server";
 
 export type AuthActionState = { error: string | null };
 
+// O destino vem de um campo do formulário: só aceitamos caminho interno
+// ("/algo"), nunca "//host" nem URL absoluta — senão o login vira um
+// redirecionamento aberto para fora da plataforma.
+function safeNext(value: FormDataEntryValue | null): string {
+  const next = String(value ?? "");
+  return /^\/(?!\/)/.test(next) ? next : "/projects";
+}
+
 export async function signIn(
   _prevState: AuthActionState,
   formData: FormData,
@@ -31,7 +39,7 @@ export async function signIn(
   }
 
   await supabase.rpc("register_login_success", { p_email: email });
-  redirect("/projects");
+  redirect(safeNext(formData.get("next")));
 }
 
 export async function signUp(
@@ -41,6 +49,7 @@ export async function signUp(
   const fullName = String(formData.get("fullName") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const next = safeNext(formData.get("next"));
 
   if (password.length < 8) {
     return { error: "A senha precisa ter pelo menos 8 caracteres." };
@@ -63,10 +72,10 @@ export async function signUp(
   // Se a confirmação de e-mail estiver desativada no projeto Supabase,
   // signUp já devolve uma sessão ativa — não faz sentido mandar pro login.
   if (data.session) {
-    redirect("/projects");
+    redirect(next);
   }
 
-  redirect("/login?cadastro=confirme-seu-email");
+  redirect(`/login?cadastro=confirme-seu-email&next=${encodeURIComponent(next)}`);
 }
 
 export async function signOut() {
