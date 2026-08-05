@@ -20,15 +20,28 @@ import { RulerBand } from "@/components/writing/WritingRuler";
 import { WritingStatusBar } from "@/components/writing/WritingStatusBar";
 import { SearchReplacePanel } from "@/components/writing/SearchReplacePanel";
 import { buildEditorExtensions } from "@/lib/writing/editor-extensions";
-import { ZOOM_DEFAULT } from "@/lib/writing/page-metrics";
+import { DEFAULT_MARGINS, ZOOM_DEFAULT, type PageSetup } from "@/lib/writing/page-metrics";
 import type { StatSourceKind } from "@/lib/writing/stat-sources";
-import { getReference, type OpenArticle } from "@/lib/writing/reference-sources";
+import {
+  getReference,
+  listProjectReferences,
+  type OpenArticle,
+} from "@/lib/writing/reference-sources";
 import { buildCitationInsert } from "@/lib/writing/quote";
+import {
+  bibliographyTitleAlign,
+  buildBibliography,
+  collectCitedReferenceIds,
+  BIBLIOGRAPHY_TITLE,
+  type BibliographyScope,
+} from "@/lib/writing/bibliography";
+import { findBibliography } from "@/lib/writing/extensions/bibliography";
 import type { CitationStyle } from "@/lib/references/format";
 import {
   updateDocumentContent,
   updateDocumentTitle,
   updateDocumentHeaderFooter,
+  updateDocumentPageSetup,
   updateWordGoal,
   deleteDocument,
 } from "@/lib/actions/documents";
@@ -57,6 +70,7 @@ export function DocumentEditor({
   initialWordGoal,
   initialHeader,
   initialFooter,
+  initialPageSetup,
   userEmail,
 }: {
   documentId: string;
@@ -66,6 +80,8 @@ export function DocumentEditor({
   initialWordGoal: number | null;
   initialHeader: string | null;
   initialFooter: string | null;
+  /** Margens e entrelinha do documento; `null` enquanto a migration não rodou. */
+  initialPageSetup: PageSetup | null;
   userEmail: string;
 }) {
   const [title, setTitle] = useState(initialTitle);
@@ -73,6 +89,12 @@ export function DocumentEditor({
     header: initialHeader ?? "",
     footer: initialFooter ?? "",
   });
+  // Configuração de página: as margens vão para a folha **e** para a medição da
+  // paginação (é a mesma geometria dos dois lados, senão o papel discorda da
+  // tela); a entrelinha é uma variável CSS lida pelo `.folium-editor`.
+  const [pageSetup, setPageSetup] = useState<PageSetup>(
+    initialPageSetup ?? { margins: DEFAULT_MARGINS, lineHeight: null },
+  );
   const [goal, setGoal] = useState(initialWordGoal);
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
@@ -105,6 +127,7 @@ export function DocumentEditor({
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const headerFooterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pageSetupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleEditorUpdate = useCallback(
     (json: object, text: string) => {
@@ -126,8 +149,12 @@ export function DocumentEditor({
     immediatelyRender: false,
     editorProps: {
       attributes: {
+        // Sem `prose-headings:font-serif`: a folha inteira herda a fonte padrão
+        // do documento (Arial, ver `SHEET_FONT_FAMILY`), títulos inclusive —
+        // como num processador de texto, onde trocar a fonte padrão vale para
+        // todo o documento. A serifada Cormorant continua na lista de fontes.
         class:
-          "folium-editor prose prose-zinc prose-lg prose-headings:font-serif prose-headings:font-semibold prose-p:leading-relaxed max-w-none focus:outline-none",
+          "folium-editor prose prose-zinc prose-lg prose-headings:font-semibold prose-p:leading-relaxed max-w-none focus:outline-none",
       },
     },
     onCreate: ({ editor }) => {
@@ -210,6 +237,27 @@ export function DocumentEditor({
     }, 800);
   }
 
+  /**
+   * Muda margens/entrelinha. O estado entra na hora (a paginação remede sozinha
+   * quando a geometria muda) e a gravação é adiada, como no autosave do texto —
+   * arrastar um campo de margem dispara vários valores em sequência.
+   */
+  function handlePageSetupChange(next: PageSetup) {
+    setPageSetup(next);
+    setSaveStatus("saving");
+    if (pageSetupTimer.current) clearTimeout(pageSetupTimer.current);
+    pageSetupTimer.current = setTimeout(async () => {
+      await updateDocumentPageSetup(documentId, {
+        marginTop: next.margins.top,
+        marginRight: next.margins.right,
+        marginBottom: next.margins.bottom,
+        marginLeft: next.margins.left,
+        lineHeight: next.lineHeight,
+      });
+      setSaveStatus("saved");
+    }, 800);
+  }
+
   function handleGoalChange(next: number | null) {
     setGoal(next);
     void updateWordGoal(documentId, next);
@@ -266,14 +314,64 @@ export function DocumentEditor({
     editor.chain().focus().insertContent(content).run();
   }
 
-  /** Trocar a norma reescreve todas as citações já postas no documento. */
+  /**
+   * Escreve a lista de referências no fim do documento — ou reescreve a que já
+   * está lá. As entradas saem da biblioteca do projeto na norma corrente; o
+   * escopo decide se entram só as obras citadas no texto ou a biblioteca toda.
+   */
+  async function generateBibliography(scope: BibliographyScope, style = citationStyle) {
+    if (!editor) return;
+    const references = await listProjectReferences(projectId);
+    const citedIds = collectCitedReferenceIds(editor.state.doc);
+    const { entries } = buildBibliography({ references, citedIds, scope, style });
+    if (entries.length === 0) {
+      alert(
+        scope === "cited"
+          ? "Nenhuma obra citada no texto ainda — cite uma referência para ela entrar na lista."
+          : "A biblioteca do projeto está vazia. Cadastre referências na aba Referências.",
+      );
+      return;
+    }
+    editor
+      .chain()
+      .focus()
+      .setBibliography({
+        entries,
+        style,
+        scope,
+        title: BIBLIOGRAPHY_TITLE[style],
+        titleAlign: bibliographyTitleAlign(style),
+      })
+      .run();
+  }
+
+  /**
+   * Trocar a norma reescreve todas as citações já postas no documento — e, se a
+   * lista de referências já foi gerada, também a lista (senão o documento
+   * ficaria com a chamada em APA e a entrada em ABNT).
+   */
   function handleCitationStyleChange(next: CitationStyle) {
     setCitationStyle(next);
-    editor?.commands.setCitationStyle(next);
+    if (!editor) return;
+    editor.commands.setCitationStyle(next);
+    const existing = findBibliography(editor.state.doc);
+    if (existing) {
+      void generateBibliography((existing.node.attrs.scope as BibliographyScope) ?? "cited", next);
+    }
   }
 
   return (
-    <div className="folium-shell fixed inset-0 z-50 flex flex-col">
+    <div
+      className="folium-shell fixed inset-0 z-50 flex flex-col"
+      // A entrelinha do corpo desce por variável CSS: assim vale para a folha
+      // na tela **e** para o clone da impressão, que é filho daqui. Sem valor,
+      // a variável não existe e o `.folium-editor` fica no padrão de sempre.
+      style={
+        pageSetup.lineHeight
+          ? ({ "--folium-line-height": String(pageSetup.lineHeight) } as React.CSSProperties)
+          : undefined
+      }
+    >
       <DocumentTopBar
         projectId={projectId}
         title={title}
@@ -308,6 +406,8 @@ export function DocumentEditor({
           onInsertStat={() => setRightPanel("stats")}
           onOpenReferences={() => setRightPanel("references")}
           onTableInserted={() => setTab("Tabela")}
+          citationStyle={citationStyle}
+          onGenerateBibliography={(scope) => void generateBibliography(scope)}
           onFind={() => setSearch({ open: true, replace: false })}
           onReplace={() => setSearch({ open: true, replace: true })}
           showRuler={showRuler}
@@ -315,6 +415,8 @@ export function DocumentEditor({
           header={headerFooter.header}
           footer={headerFooter.footer}
           onHeaderFooterChange={handleHeaderFooterChange}
+          pageSetup={pageSetup}
+          onPageSetupChange={handlePageSetupChange}
           onDelete={() => {
             if (confirm("Excluir este documento?")) deleteDocument(documentId, projectId);
           }}
@@ -338,6 +440,7 @@ export function DocumentEditor({
               zoom={zoom}
               scrollLeft={viewport.scrollLeft}
               gutter={viewport.gutter}
+              margins={pageSetup.margins}
             />
           )}
           <WritingCanvas
@@ -345,6 +448,7 @@ export function DocumentEditor({
             zoom={zoom}
             header={headerFooter.header}
             footer={headerFooter.footer}
+            margins={pageSetup.margins}
             onPageCountChange={setPageCount}
             onCurrentPageChange={setCurrentPage}
             onViewport={setViewport}
@@ -401,6 +505,7 @@ export function DocumentEditor({
       </div>
 
       <WritingStatusBar
+        editor={editor}
         currentPage={currentPage}
         pageCount={pageCount}
         wordCount={wordCount}

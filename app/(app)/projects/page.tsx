@@ -3,6 +3,7 @@ import { ArrowUpRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { NewProjectForm } from "./NewProjectForm";
 import { PendingInvites } from "./PendingInvites";
+import { JoinWithCodeForm } from "./JoinWithCodeForm";
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -42,7 +43,10 @@ export default async function ProjectsPage() {
             {greeting()}, {name} — sua pesquisa, do texto aos dados.
           </p>
         </div>
-        <NewProjectForm />
+        <div className="flex flex-wrap items-center gap-2">
+          <JoinWithCodeForm />
+          <NewProjectForm />
+        </div>
       </div>
 
       <PendingInvites />

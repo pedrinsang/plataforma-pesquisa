@@ -6,13 +6,17 @@ import { LoginForm } from "./LoginForm";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cadastro?: string }>;
+  searchParams: Promise<{ cadastro?: string; next?: string }>;
 }) {
-  const { cadastro } = await searchParams;
+  const { cadastro, next } = await searchParams;
   const infoMessage =
     cadastro === "confirme-seu-email"
       ? "Cadastro realizado! Confira seu e-mail para confirmar a conta antes de entrar."
-      : undefined;
+      : next?.startsWith("/convite/")
+        ? "Entre na sua conta para aceitar o convite."
+        : undefined;
+  // só caminho interno sobrevive (o mesmo cuidado da action contra open redirect)
+  const safeNext = next && /^\/(?!\/)/.test(next) ? next : undefined;
 
   return (
     <div className="flex min-h-full flex-1 items-center justify-center p-6">
@@ -30,7 +34,7 @@ export default async function LoginPage({
           Entrar
         </h1>
         <Card>
-          <LoginForm infoMessage={infoMessage} />
+          <LoginForm infoMessage={infoMessage} next={safeNext} />
         </Card>
       </div>
     </div>

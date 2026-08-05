@@ -26,19 +26,23 @@ import { Pagination } from "@/lib/writing/extensions/pagination";
 import { SearchReplace } from "@/lib/writing/extensions/search-replace";
 import { StatChart } from "@/lib/writing/extensions/stat-chart";
 import { Citation } from "@/lib/writing/extensions/citation";
+import { Bibliography } from "@/lib/writing/extensions/bibliography";
+import { SHEET_FONT_FAMILY } from "@/lib/writing/typography";
 
-// Famílias de fonte curadas para a Escrita. As duas primeiras são as fontes da
-// identidade Folium (corpo/títulos); as demais são clássicas de processador de
-// texto, para quem precisa entregar em formato específico.
+// Famílias de fonte curadas para a Escrita. A primeira é o padrão da folha
+// (ver `SHEET_FONT_FAMILY`): "Arial 12" é o que os editais pedem, então é a
+// fonte em que o documento nasce. Depois vêm as clássicas de processador de
+// texto e, por último, as fontes da identidade Folium, para quem quiser o
+// visual editorial no próprio documento.
 export const FONT_FAMILIES: Array<{ label: string; value: string }> = [
-  { label: "Lora (padrão)", value: "var(--font-lora), Georgia, serif" },
-  { label: "Cormorant", value: "var(--font-cormorant), Georgia, serif" },
-  { label: "Arial", value: "Arial, Helvetica, sans-serif" },
+  { label: "Arial (padrão)", value: SHEET_FONT_FAMILY },
   { label: "Times New Roman", value: '"Times New Roman", Times, serif' },
   { label: "Georgia", value: "Georgia, serif" },
   { label: "Garamond", value: 'Garamond, "EB Garamond", serif' },
   { label: "Verdana", value: "Verdana, Geneva, sans-serif" },
   { label: "Courier New", value: '"Courier New", Courier, monospace' },
+  { label: "Lora", value: "var(--font-lora), Georgia, serif" },
+  { label: "Cormorant", value: "var(--font-cormorant), Georgia, serif" },
 ];
 
 // Tamanhos de fonte: ver `lib/writing/typography.ts` — são pontos (pt), como no
@@ -104,5 +108,6 @@ export function buildEditorExtensions({ projectId }: { projectId?: string } = {}
     SearchReplace,
     StatChart,
     Citation.configure({ projectId: projectId ?? null }),
+    Bibliography,
   ];
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BASE_FONT_PT, FONT_SIZES_PT } from "@/lib/writing/typography";
+import { FONT_SIZES_PT } from "@/lib/writing/typography";
 
 const MIN = 6;
 const MAX = 200;
@@ -9,18 +9,19 @@ const MAX = 200;
 /**
  * Passo de tamanho de fonte (− 12 +) do design: os botões saltam para o próximo
  * tamanho da lista do Word e o campo do meio aceita qualquer valor digitado.
- * O número é o **corpo em pontos**, a mesma unidade da caixa do Word — texto sem
- * tamanho explícito mostra o corpo padrão da folha, e não um traço.
+ * O número é o **corpo em pontos**, a mesma unidade da caixa do Word — e é
+ * sempre o corpo que está valendo no cursor (quem resolve o padrão da folha é
+ * `resolveFontSizePt`), nunca um traço.
  */
 export function FontSizeStepper({
   value,
   onChange,
 }: {
-  /** Corpo atual em pt, ou null quando o texto usa o padrão da folha. */
-  value: number | null;
+  /** Corpo que está valendo no cursor, em pt. */
+  value: number;
   onChange: (size: number) => void;
 }) {
-  const shown = value ?? BASE_FONT_PT;
+  const shown = value;
   const [draft, setDraft] = useState(String(shown));
   const inputRef = useRef<HTMLInputElement>(null);
 

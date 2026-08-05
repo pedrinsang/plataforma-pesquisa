@@ -1,20 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorContent, type Editor } from "@tiptap/react";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import {
-  CONTENT_HEIGHT_PX,
-  CONTENT_WIDTH_PX,
+  DEFAULT_MARGINS,
   PAGE_GAP_PX,
   PAGE_HEIGHT_PX,
-  PAGE_MARGIN_PX,
   PAGE_STRIDE_PX,
   PAGE_WIDTH_PX,
   pageContentBottom,
+  pageGeometry,
   pageOfFlowY,
   sheetTop,
   stackHeight,
+  type PageGeometry,
+  type PageMargins,
 } from "@/lib/writing/page-metrics";
 import {
   paginationKey,
@@ -37,8 +38,19 @@ const MIN_LINES = 2;
  * Blocos que podem ser repartidos entre duas folhas. Título não parte (fica com
  * o texto que ele abre), e tabela/imagem/quebra/gráfico não têm linhas de texto
  * para repartir — esses continuam descendo inteiros.
+ *
+ * A bibliografia entra aqui pelo mesmo motivo das listas: por fora é um nó só
+ * (para o botão da faixa poder reescrevê-la no lugar), mas por dentro são
+ * parágrafos comuns, e uma lista de referências passa de uma folha com
+ * facilidade — sem repartir, ela atravessaria a virada.
  */
-const SPLITTABLE = new Set(["paragraph", "bulletList", "orderedList", "blockquote"]);
+const SPLITTABLE = new Set([
+  "paragraph",
+  "bulletList",
+  "orderedList",
+  "blockquote",
+  "bibliography",
+]);
 
 /**
  * Blocos que só partem quando não cabem numa folha inteira. Um título fica com o
@@ -120,7 +132,7 @@ type Entry = {
  * aplicados). O pareamento é por índice: cada nó de primeiro nível corresponde a
  * um filho do DOM do ProseMirror, na mesma ordem.
  */
-function readEntries(editor: Editor, zoom: number): Entry[] | null {
+function readEntries(editor: Editor, zoom: number, contentHeight: number): Entry[] | null {
   const root = editor.view.dom as HTMLElement;
   const positions: number[] = [];
   const ends: number[] = [];
@@ -158,7 +170,7 @@ function readEntries(editor: Editor, zoom: number): Entry[] | null {
     const type = types[index];
     const canSplit =
       SPLITTABLE.has(type) ||
-      (SPLITTABLE_IF_TALL.has(type) && height > CONTENT_HEIGHT_PX + EPS);
+      (SPLITTABLE_IF_TALL.has(type) && height > contentHeight + EPS);
     entries.push({
       pos: positions[index],
       end: ends[index],
@@ -363,6 +375,7 @@ function resolveAnchor(editor: Editor, entry: Entry, line: Line): number {
 function planPages(
   editor: Editor,
   entries: Entry[],
+  contentHeight: number,
 ): { spacers: PageSpacer[]; pageCount: number } {
   const spacers: PageSpacer[] = [];
   // Vão total já reservado acima do ponto que está sendo examinado. A posição
@@ -375,9 +388,9 @@ function planPages(
   for (let index = 0; index < entries.length; index += 1) {
     const entry = entries[index];
     let top = entry.naturalTop + offset;
-    const fitsInOnePage = entry.height <= CONTENT_HEIGHT_PX + EPS;
+    const fitsInOnePage = entry.height <= contentHeight + EPS;
     const overflows = (at: number) =>
-      at + entry.height > pageContentBottom(pageOfFlowY(at)) + EPS;
+      at + entry.height > pageContentBottom(pageOfFlowY(at), contentHeight) + EPS;
 
     if (forceNextPage) {
       const push = sheetTop(pageOfFlowY(top) + 1) - top;
@@ -391,7 +404,7 @@ function planPages(
 
     if (overflows(top)) {
       if (entry.lines && entry.lines.length > 1) {
-        offset += splitEntry(editor, entry, offset, spacers);
+        offset += splitEntry(editor, entry, offset, spacers, contentHeight);
       } else if (fitsInOnePage) {
         const push = sheetTop(pageOfFlowY(top) + 1) - top;
         if (push > EPS) {
@@ -405,7 +418,7 @@ function planPages(
     }
 
     if (KEEP_WITH_NEXT.has(entry.type)) {
-      const push = keepWithNextPush(entries, index, top, offset);
+      const push = keepWithNextPush(entries, index, top, offset, contentHeight);
       if (push > EPS) {
         spacers.push({ pos: entry.pos, height: push });
         offset += push;
@@ -449,6 +462,7 @@ function keepWithNextPush(
   index: number,
   top: number,
   offset: number,
+  contentHeight: number,
 ): number {
   const page = pageOfFlowY(top);
   if (top <= sheetTop(page) + EPS) return 0;
@@ -459,8 +473,8 @@ function keepWithNextPush(
   if (!after || after.isBreak) return 0;
 
   const need = firstUnitBottom(after);
-  if (need - after.naturalTop > CONTENT_HEIGHT_PX) return 0;
-  if (need + offset <= pageContentBottom(page) + EPS) return 0;
+  if (need - after.naturalTop > contentHeight) return 0;
+  if (need + offset <= pageContentBottom(page, contentHeight) + EPS) return 0;
   return sheetTop(page + 1) - top;
 }
 
@@ -494,6 +508,7 @@ function splitEntry(
   entry: Entry,
   offsetIn: number,
   spacers: PageSpacer[],
+  contentHeight: number,
 ): number {
   const lines = entry.lines;
   if (!lines) return 0;
@@ -520,7 +535,10 @@ function splitEntry(
   while (i < lines.length && guard > 0) {
     guard -= 1;
     const line = lines[i];
-    if (line.bottom + offset <= pageContentBottom(pageOfFlowY(line.top + offset)) + EPS) {
+    if (
+      line.bottom + offset <=
+      pageContentBottom(pageOfFlowY(line.top + offset), contentHeight) + EPS
+    ) {
       i += 1;
       continue;
     }
@@ -615,6 +633,7 @@ export function WritingCanvas({
   zoom,
   header = "",
   footer = "",
+  margins = DEFAULT_MARGINS,
   onPageCountChange,
   onCurrentPageChange,
   onViewport,
@@ -623,11 +642,26 @@ export function WritingCanvas({
   zoom: number;
   header?: string;
   footer?: string;
+  /**
+   * Margens da folha, em cm. Mudar isto muda a área de texto e, com ela, toda a
+   * paginação — a geometria abaixo é a fonte única para a medição e para o
+   * desenho, para que o papel nunca discorde da tela.
+   */
+  margins?: PageMargins;
   onPageCountChange?: (count: number) => void;
   onCurrentPageChange?: (page: number) => void;
   /** Rolagem horizontal e largura da barra de rolagem, para alinhar a régua. */
   onViewport?: (v: { scrollLeft: number; gutter: number }) => void;
 }) {
+  // Memoizado pelos quatro **números**, não pelo objeto: `paginate` depende da
+  // geometria, e um objeto novo a cada render remontaria o agendamento da
+  // paginação sem parar — exatamente o laço que a trava de assinatura existe
+  // para evitar. Assim um pai que passe `margins` inline também fica seguro.
+  const { top: mt, right: mr, bottom: mb, left: ml } = margins;
+  const geo = useMemo(
+    () => pageGeometry({ top: mt, right: mr, bottom: mb, left: ml }),
+    [mt, mr, mb, ml],
+  );
   const containerRef = useRef<HTMLDivElement>(null);
   const sizerRef = useRef<HTMLDivElement>(null);
   const flowRef = useRef<HTMLDivElement>(null);
@@ -645,9 +679,9 @@ export function WritingCanvas({
   // ── paginação: mede, planeja e aplica os espaçadores ─────────────────────
   const paginate = useCallback(() => {
     if (!editor || editor.isDestroyed) return;
-    const entries = readEntries(editor, zoom);
+    const entries = readEntries(editor, zoom, geo.contentHeight);
     if (!entries) return;
-    const { spacers, pageCount: next } = planPages(editor, entries);
+    const { spacers, pageCount: next } = planPages(editor, entries, geo.contentHeight);
 
     // O que vale é o que o plugin tem aplicado, não uma cópia nossa: numa
     // edição ele remapeia os espaçadores por conta própria, e comparar com uma
@@ -673,7 +707,7 @@ export function WritingCanvas({
     pageCountRef.current = next;
     setPageCount((prev) => (prev === next ? prev : next));
     editor.commands.setPageSpacers(spacers);
-  }, [editor, zoom]);
+  }, [editor, zoom, geo]);
 
   // Agenda com timer (e não `requestAnimationFrame`): rAF não roda em aba de
   // segundo plano, e a paginação precisa ficar correta mesmo quando o documento
@@ -842,10 +876,10 @@ export function WritingCanvas({
               ref={flowRef}
               className="folium-flow"
               style={{
-                top: PAGE_MARGIN_PX,
-                left: PAGE_MARGIN_PX,
-                width: CONTENT_WIDTH_PX,
-                minHeight: CONTENT_HEIGHT_PX,
+                top: geo.top,
+                left: geo.left,
+                width: geo.contentWidth,
+                minHeight: geo.contentHeight,
               }}
             >
               <EditorContent editor={editor} />
@@ -861,7 +895,7 @@ export function WritingCanvas({
               />
             ))}
 
-            <PageOverlay pageCount={pageCount} header={header} footer={footer} />
+            <PageOverlay pageCount={pageCount} header={header} footer={footer} geo={geo} />
           </div>
         </div>
       </div>
@@ -890,10 +924,12 @@ function PageOverlay({
   pageCount,
   header,
   footer,
+  geo,
 }: {
   pageCount: number;
   header: string;
   footer: string;
+  geo: PageGeometry;
 }) {
   const hasHeader = header.trim() !== "";
   const hasFooter = footer.trim() !== "";
@@ -908,9 +944,9 @@ function PageOverlay({
               <div
                 className="folium-hf folium-hf-header"
                 style={{
-                  top: top + PAGE_MARGIN_PX * 0.42,
-                  left: PAGE_MARGIN_PX,
-                  right: PAGE_MARGIN_PX,
+                  top: top + geo.top * 0.42,
+                  left: geo.left,
+                  right: geo.right,
                 }}
               >
                 {resolveTokens(header, i + 1, pageCount)}
@@ -920,9 +956,9 @@ function PageOverlay({
               <div
                 className="folium-hf folium-hf-footer"
                 style={{
-                  top: bottom - PAGE_MARGIN_PX * 0.62,
-                  left: PAGE_MARGIN_PX,
-                  right: PAGE_MARGIN_PX,
+                  top: bottom - geo.bottom * 0.62,
+                  left: geo.left,
+                  right: geo.right,
                 }}
               >
                 {resolveTokens(footer, i + 1, pageCount)}

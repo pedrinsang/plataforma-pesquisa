@@ -9,11 +9,12 @@ import { FormMessage } from "@/components/ui/FormMessage";
 
 const initialState: AuthActionState = { error: null };
 
-export function LoginForm({ infoMessage }: { infoMessage?: string }) {
+export function LoginForm({ infoMessage, next }: { infoMessage?: string; next?: string }) {
   const [state, formAction, isPending] = useActionState(signIn, initialState);
 
   return (
     <form action={formAction} className="space-y-4">
+      {next && <input type="hidden" name="next" value={next} />}
       {infoMessage && <FormMessage success={infoMessage} />}
       <div>
         <Label htmlFor="email">E-mail</Label>
@@ -35,7 +36,10 @@ export function LoginForm({ infoMessage }: { infoMessage?: string }) {
       </Button>
       <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
         Ainda não tem conta?{" "}
-        <Link href="/signup" className="font-medium text-accent-teal hover:underline">
+        <Link
+          href={next ? `/signup?next=${encodeURIComponent(next)}` : "/signup"}
+          className="font-medium text-accent-teal hover:underline"
+        >
           Cadastre-se
         </Link>
       </p>

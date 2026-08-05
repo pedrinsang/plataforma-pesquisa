@@ -9,6 +9,7 @@ import {
   BarChart3,
   Baseline,
   BookMarked,
+  BookText,
   Bold,
   Check,
   Highlighter,
@@ -27,6 +28,7 @@ import {
   Replace,
   Rows3,
   Ruler,
+  Scan,
   Search,
   SeparatorHorizontal,
   Strikethrough,
@@ -39,6 +41,8 @@ import {
 } from "lucide-react";
 import { MenuDivider, MenuItem, MenuLabel, Popover } from "../ui";
 import { HeaderFooterControl } from "../HeaderFooterControl";
+import { PageSetupControl } from "../PageSetupControl";
+import { BibliographyPanel } from "./BibliographyPanel";
 import { ColorPanel } from "./ColorPanel";
 import { LinkPanel } from "./LinkPanel";
 import { ImagePanel } from "./ImagePanel";
@@ -60,8 +64,12 @@ import {
   LINE_HEIGHTS,
   PARAGRAPH_SPACINGS,
 } from "@/lib/writing/editor-extensions";
-import { fontSizeToPt, ptToCss } from "@/lib/writing/typography";
+import { SHEET_FONT_FAMILY, fontSizeToPt, ptToCss } from "@/lib/writing/typography";
+import { fontFamilyLabel, resolveFontSizePt } from "@/lib/writing/cursor-format";
 import { refreshAllStatSources } from "@/lib/writing/extensions/stat-chart";
+import type { CitationStyle } from "@/lib/references/format";
+import type { BibliographyScope } from "@/lib/writing/bibliography";
+import type { PageSetup } from "@/lib/writing/page-metrics";
 
 const BLOCK_STYLES = [
   { label: "Texto normal", level: 0 as const },
@@ -73,11 +81,6 @@ const BLOCK_STYLES = [
 
 const CORMORANT = "var(--font-cormorant), Georgia, serif";
 const LORA = "var(--font-lora), Georgia, serif";
-
-function familyLabel(value: string | null): string {
-  if (!value) return "Lora";
-  return FONT_FAMILIES.find((f) => f.value === value)?.label.replace(" (padrão)", "") ?? "Fonte";
-}
 
 function spacingLabel(pt: number | null): string {
   if (pt == null) return "auto";
@@ -95,6 +98,10 @@ export type RibbonProps = {
   onOpenReferences: () => void;
   /** Uma tabela acabou de nascer — a faixa vai para a aba contextual dela. */
   onTableInserted?: () => void;
+  /** Norma do documento — define a forma das entradas da bibliografia. */
+  citationStyle: CitationStyle;
+  /** Escreve (ou reescreve) a lista de referências no fim do documento. */
+  onGenerateBibliography: (scope: BibliographyScope) => void;
   onFind: () => void;
   onReplace: () => void;
   showRuler: boolean;
@@ -102,6 +109,9 @@ export type RibbonProps = {
   header: string;
   footer: string;
   onHeaderFooterChange: (next: { header: string; footer: string }) => void;
+  /** Margens e entrelinha do documento (faixa Layout → Margens). */
+  pageSetup: PageSetup;
+  onPageSetupChange: (next: PageSetup) => void;
   onDelete: () => void;
   wordCount: number;
   charCount: number;
@@ -121,14 +131,27 @@ export function Ribbon(props: RibbonProps) {
     editor,
     selector: ({ editor }) => {
       let statLinks = 0;
+      let hasBibliography = false;
+      // Obras distintas citadas no texto — é o tamanho que a bibliografia teria.
+      const cited = new Set<string>();
       editor.state.doc.descendants((node) => {
         if (node.type.name === "statChart") statLinks += 1;
+        else if (node.type.name === "bibliography") hasBibliography = true;
+        else if (node.type.name === "citation" && node.attrs.referenceId) {
+          cited.add(node.attrs.referenceId as string);
+        }
       });
-      const block = editor.state.selection.$from.parent.attrs as {
+      const parent = editor.state.selection.$from.parent;
+      const block = parent.attrs as {
         lineHeight?: string | null;
         spaceBefore?: number | null;
         spaceAfter?: number | null;
       };
+      // Nível do título sob o cursor: é ele que define o corpo padrão do bloco,
+      // então a caixa de tamanho mostra 16 num Título 1 e 12 no texto normal.
+      const headingLevel = [1, 2, 3, 4].find((l) => editor.isActive("heading", { level: l })) ?? 0;
+      const fontFamily = (editor.getAttributes("textStyle").fontFamily as string) ?? null;
+      const fontSize = fontSizeToPt(editor.getAttributes("textStyle").fontSize);
       return {
         canUndo: editor.can().undo(),
         canRedo: editor.can().redo(),
@@ -147,15 +170,21 @@ export function Ribbon(props: RibbonProps) {
         alignCenter: editor.isActive({ textAlign: "center" }),
         alignRight: editor.isActive({ textAlign: "right" }),
         alignJustify: editor.isActive({ textAlign: "justify" }),
-        headingLevel: [1, 2, 3, 4].find((l) => editor.isActive("heading", { level: l })) ?? 0,
-        fontFamily: (editor.getAttributes("textStyle").fontFamily as string) ?? null,
-        fontSize: fontSizeToPt(editor.getAttributes("textStyle").fontSize),
+        headingLevel,
+        fontFamily,
+        // Nome e corpo **que estão valendo** — o explícito quando existe, senão
+        // o padrão da folha para aquele bloco. Antes a caixa dizia "Lora 12"
+        // dentro de um título, que é outra fonte e outro corpo.
+        fontFamilyLabel: fontFamilyLabel(fontFamily),
+        fontSizePt: resolveFontSizePt(fontSize, headingLevel),
         color: (editor.getAttributes("textStyle").color as string) ?? null,
         highlight: (editor.getAttributes("highlight").color as string) ?? null,
         lineHeight: block.lineHeight ?? null,
         spaceBefore: block.spaceBefore ?? null,
         spaceAfter: block.spaceAfter ?? null,
         statLinks,
+        citedCount: cited.size,
+        hasBibliography,
       };
     },
   });
@@ -232,10 +261,10 @@ export function Ribbon(props: RibbonProps) {
               trigger={(p) => (
                 <RibbonSelectTrigger
                   {...p}
-                  title="Família de fonte"
+                  title="Família de fonte no cursor"
                   width={116}
-                  label={familyLabel(s.fontFamily)}
-                  style={{ fontFamily: LORA, fontSize: 13 }}
+                  label={s.fontFamilyLabel}
+                  style={{ fontFamily: s.fontFamily ?? SHEET_FONT_FAMILY, fontSize: 13 }}
                 />
               )}
             >
@@ -268,7 +297,7 @@ export function Ribbon(props: RibbonProps) {
             </Popover>
 
             <FontSizeStepper
-              value={s.fontSize}
+              value={s.fontSizePt}
               onChange={(size) => chain().setFontSize(ptToCss(size)).run()}
             />
 
@@ -532,6 +561,17 @@ export function Ribbon(props: RibbonProps) {
               onClick={props.onToggleRuler}
               active={props.showRuler}
             />
+            <PageSetupControl
+              setup={props.pageSetup}
+              onChange={props.onPageSetupChange}
+              className="fx-big"
+              icon={
+                <>
+                  <Scan size={19} />
+                  <span>Margens</span>
+                </>
+              }
+            />
             <HeaderFooterControl
               header={props.header}
               footer={props.footer}
@@ -612,14 +652,46 @@ export function Ribbon(props: RibbonProps) {
             icon={<BookMarked size={19} />}
             onClick={props.onOpenReferences}
           />
-          <RibbonBigButton
-            label="Bibliografia"
-            title="Gerar bibliografia — em breve"
-            icon={<SeparatorHorizontal size={19} />}
-            onClick={() => {}}
-            disabled
-          />
-          <RibbonReadout>a lista completa fica na aba Referências do projeto</RibbonReadout>
+
+          <Popover
+            panelClassName="w-72"
+            trigger={({ open, toggle, triggerRef }) => (
+              <button
+                ref={triggerRef}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={toggle}
+                className={`fx-big ${open ? "is-open" : ""}`}
+                title={
+                  s.hasBibliography
+                    ? "Refazer a lista de referências do documento"
+                    : "Gerar a lista de referências no fim do documento"
+                }
+              >
+                <BookText size={19} />
+                <span>Bibliografia</span>
+              </button>
+            )}
+          >
+            {(close) => (
+              <BibliographyPanel
+                editor={editor}
+                projectId={props.projectId}
+                style={props.citationStyle}
+                onGenerate={props.onGenerateBibliography}
+                close={close}
+              />
+            )}
+          </Popover>
+
+          <RibbonReadout
+            icon={
+              s.hasBibliography ? <Check size={11} style={{ color: "var(--fx-teal)" }} /> : undefined
+            }
+          >
+            {s.citedCount} {s.citedCount === 1 ? "obra citada" : "obras citadas"}
+            {s.hasBibliography ? " · lista no documento" : ""}
+          </RibbonReadout>
         </RibbonGroup>
       )}
     </div>

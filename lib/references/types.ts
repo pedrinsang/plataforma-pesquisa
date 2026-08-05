@@ -16,6 +16,16 @@ export type ReferenceDraft = {
   issue: string | null;
   pages: string | null;
   edition: string | null;
+  // Elementos que a ABNT NBR 6023:2018 pede e que só existem aqui: local de
+  // publicação (essencial), vinculação acadêmica da tese, mês do fascículo,
+  // ano aproximado entre colchetes e numeração do evento.
+  place: string | null;
+  institution: string | null;
+  degree: string | null;
+  program: string | null;
+  issuedMonth: string | null;
+  yearText: string | null;
+  eventNumber: string | null;
   abstract: string | null;
   isbn: string | null;
   issn: string | null;
@@ -46,6 +56,13 @@ export function emptyDraft(): ReferenceDraft {
     issue: null,
     pages: null,
     edition: null,
+    place: null,
+    institution: null,
+    degree: null,
+    program: null,
+    issuedMonth: null,
+    yearText: null,
+    eventNumber: null,
     abstract: null,
     isbn: null,
     issn: null,
@@ -79,6 +96,13 @@ export type ReferenceRow = {
   issue: string | null;
   pages: string | null;
   edition: string | null;
+  place: string | null;
+  institution: string | null;
+  degree: string | null;
+  program: string | null;
+  issued_month: string | null;
+  year_text: string | null;
+  event_number: string | null;
   abstract: string | null;
   isbn: string | null;
   issn: string | null;
@@ -141,6 +165,13 @@ export function draftToPreviewRow(draft: ReferenceDraft): ReferenceRow {
     issue: draft.issue,
     pages: draft.pages,
     edition: draft.edition,
+    place: draft.place,
+    institution: draft.institution,
+    degree: draft.degree,
+    program: draft.program,
+    issued_month: draft.issuedMonth,
+    year_text: draft.yearText,
+    event_number: draft.eventNumber,
     abstract: draft.abstract,
     isbn: draft.isbn,
     issn: draft.issn,
@@ -173,6 +204,13 @@ export function rowToDraft(row: ReferenceRow): ReferenceDraft {
     issue: row.issue,
     pages: row.pages,
     edition: row.edition,
+    place: row.place,
+    institution: row.institution,
+    degree: row.degree,
+    program: row.program,
+    issuedMonth: row.issued_month,
+    yearText: row.year_text,
+    eventNumber: row.event_number,
     abstract: row.abstract,
     isbn: row.isbn,
     issn: row.issn,

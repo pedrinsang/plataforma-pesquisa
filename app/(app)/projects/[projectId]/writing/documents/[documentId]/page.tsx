@@ -29,6 +29,15 @@ export default async function DocumentPage({
     .eq("id", documentId)
     .single();
 
+  // Mesma tolerância para a configuração de página
+  // (`20260806130000_document_page_setup`): sem as colunas, o editor cai no
+  // padrão de 2,5 cm e entrelinha 1, que é como ele sempre desenhou.
+  const { data: pageSetup } = await supabase
+    .from("documents")
+    .select("margin_top, margin_right, margin_bottom, margin_left, line_height")
+    .eq("id", documentId)
+    .single();
+
   return (
     <DocumentEditor
       documentId={document.id}
@@ -38,6 +47,20 @@ export default async function DocumentPage({
       initialWordGoal={document.word_goal}
       initialHeader={headerFooter?.header_text ?? null}
       initialFooter={headerFooter?.footer_text ?? null}
+      initialPageSetup={
+        pageSetup
+          ? {
+              margins: {
+                top: Number(pageSetup.margin_top),
+                right: Number(pageSetup.margin_right),
+                bottom: Number(pageSetup.margin_bottom),
+                left: Number(pageSetup.margin_left),
+              },
+              lineHeight:
+                pageSetup.line_height === null ? null : Number(pageSetup.line_height),
+            }
+          : null
+      }
       userEmail={user?.email ?? ""}
     />
   );

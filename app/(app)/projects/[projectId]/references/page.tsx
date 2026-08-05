@@ -6,7 +6,7 @@ import { ReferencesManager } from "./ReferencesManager";
 // Precisa ser um literal só: o supabase-js infere o tipo do retorno a partir
 // da string do select — concatenar com "+" derruba a inferência.
 // prettier-ignore
-const REFERENCE_COLUMNS = "id, ref_type, title, authors, year, doi, url, container_title, publisher, volume, issue, pages, edition, abstract, isbn, issn, pmid, arxiv_id, accessed_at, citation_key, tags, notes, is_essential, file_path, file_name, file_size, file_mime, created_at";
+const REFERENCE_COLUMNS = "id, ref_type, title, authors, year, doi, url, container_title, publisher, volume, issue, pages, edition, place, institution, degree, program, issued_month, year_text, event_number, abstract, isbn, issn, pmid, arxiv_id, accessed_at, citation_key, tags, notes, is_essential, file_path, file_name, file_size, file_mime, created_at";
 
 export default async function ReferencesPage({
   params,

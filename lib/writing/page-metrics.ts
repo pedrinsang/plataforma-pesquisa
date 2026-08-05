@@ -5,20 +5,73 @@ export const PX_PER_CM = 96 / 2.54;
 
 export const PAGE_WIDTH_CM = 21; // A4 retrato
 export const PAGE_HEIGHT_CM = 29.7;
-export const PAGE_MARGIN_CM = 2.5; // margem interna (onde o texto pode ocupar)
 
 export const PAGE_WIDTH_PX = Math.round(PAGE_WIDTH_CM * PX_PER_CM); // ~794
 export const PAGE_HEIGHT_PX = Math.round(PAGE_HEIGHT_CM * PX_PER_CM); // ~1123
-export const PAGE_MARGIN_PX = Math.round(PAGE_MARGIN_CM * PX_PER_CM); // ~94
 
 /** Vão visível entre duas folhas empilhadas (chão escuro aparecendo). */
 export const PAGE_GAP_PX = 20;
 
-/** Altura útil de texto dentro de uma folha (entre as margens). */
-export const CONTENT_HEIGHT_PX = PAGE_HEIGHT_PX - PAGE_MARGIN_PX * 2;
+// ── margens ─────────────────────────────────────────────────────────────────
+// As margens deixaram de ser uma constante única porque a norma que rege um
+// trabalho acadêmico brasileiro (ABNT NBR 14724:2024) pede margens
+// **assimétricas**: 3 cm em cima e à esquerda, 2 cm embaixo e à direita. Com um
+// valor só, nenhum documento escrito aqui saía conforme.
 
-/** Largura útil de texto dentro de uma folha. */
-export const CONTENT_WIDTH_PX = PAGE_WIDTH_PX - PAGE_MARGIN_PX * 2;
+/** Margens da folha, em centímetros — a unidade em que um edital as escreve. */
+export type PageMargins = { top: number; right: number; bottom: number; left: number };
+
+/** Padrão do editor: folha equilibrada, para quem não segue norma nenhuma. */
+export const DEFAULT_MARGINS: PageMargins = { top: 2.5, right: 2.5, bottom: 2.5, left: 2.5 };
+
+/** ABNT NBR 14724:2024, anverso: esquerda e superior 3 cm; direita e inferior 2 cm. */
+export const ABNT_MARGINS: PageMargins = { top: 3, right: 2, bottom: 2, left: 3 };
+
+/**
+ * Geometria da folha em pixels, derivada das margens. É o que a paginação e o
+ * desenho consomem — nenhum dos dois deve voltar a ler uma margem constante,
+ * senão a medição e o papel divergem quando o documento troca de margem.
+ */
+export type PageGeometry = {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+  contentWidth: number;
+  contentHeight: number;
+};
+
+export function pageGeometry(margins: PageMargins = DEFAULT_MARGINS): PageGeometry {
+  const top = Math.round(margins.top * PX_PER_CM);
+  const right = Math.round(margins.right * PX_PER_CM);
+  const bottom = Math.round(margins.bottom * PX_PER_CM);
+  const left = Math.round(margins.left * PX_PER_CM);
+  return {
+    top,
+    right,
+    bottom,
+    left,
+    contentWidth: PAGE_WIDTH_PX - left - right,
+    contentHeight: PAGE_HEIGHT_PX - top - bottom,
+  };
+}
+
+/** Geometria do padrão do editor — usada onde não há documento por perto. */
+export const DEFAULT_GEOMETRY = pageGeometry(DEFAULT_MARGINS);
+
+/**
+ * Configuração de página de um documento: margens e entrelinha do corpo.
+ * `lineHeight: null` é a entrelinha padrão do editor — documento escrito antes
+ * de isto existir abre exatamente como estava, e só quem escolhe um valor tem
+ * um valor gravado.
+ */
+export type PageSetup = { margins: PageMargins; lineHeight: number | null };
+
+/** Folha conforme a ABNT NBR 14724:2024: margens do anverso e entrelinha 1,5. */
+export const ABNT_PAGE_SETUP: PageSetup = { margins: ABNT_MARGINS, lineHeight: 1.5 };
+
+/** Largura útil de texto na folha padrão. */
+export const CONTENT_WIDTH_PX = DEFAULT_GEOMETRY.contentWidth;
 
 /**
  * Distância do topo de uma folha ao topo da seguinte. O fluxo de texto é
@@ -57,7 +110,11 @@ export function pageOfFlowY(y: number): number {
   return Math.max(0, Math.floor(y / PAGE_STRIDE_PX));
 }
 
-/** Último `y` de fluxo que ainda cabe na folha `page`. */
-export function pageContentBottom(page: number): number {
-  return page * PAGE_STRIDE_PX + CONTENT_HEIGHT_PX;
+/**
+ * Último `y` de fluxo que ainda cabe na folha `page`. `contentHeight` vem da
+ * geometria do documento — com margens assimétricas não existe mais uma altura
+ * útil única.
+ */
+export function pageContentBottom(page: number, contentHeight: number): number {
+  return page * PAGE_STRIDE_PX + contentHeight;
 }
