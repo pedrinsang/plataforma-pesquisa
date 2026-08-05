@@ -4,13 +4,36 @@ import {
   ReactNodeViewRenderer,
   type NodeViewProps,
 } from "@tiptap/react";
-import { useCallback, useEffect, useState } from "react";
-import { BarChart3, RefreshCw, Table2, Trash2, TriangleAlert } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ClipboardEvent,
+  type FocusEvent,
+  type FormEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import { BarChart3, Palette, RefreshCw, Trash2, TriangleAlert } from "lucide-react";
+import { MenuDivider, MenuItem, MenuLabel, Popover } from "@/components/writing/ui";
 import {
   getStatSource,
+  type StatSourceColumn,
   type StatSourceData,
   type StatSourceKind,
 } from "@/lib/writing/stat-sources";
+import {
+  TABLE_DENSITIES,
+  TABLE_LABELS,
+  TABLE_PRESETS,
+  TABLE_SIZES,
+  type TableDensity,
+  type TablePreset,
+} from "@/lib/writing/table-style";
 
 export type StatChartSize = "small" | "medium" | "full";
 
@@ -18,6 +41,16 @@ export type StatChartAttrs = {
   statId: string | null;
   statType: StatSourceKind;
   displaySize: StatChartSize;
+  /** Mesmo vocabulário de estilo da tabela do editor (ver `table-style.ts`). */
+  preset: TablePreset;
+  density: TableDensity;
+  zebra: boolean;
+  size: number | null;
+  label: string;
+  /** `null` = usa o nome da planilha; texto = legenda escrita pelo autor. */
+  caption: string | null;
+  /** `null` = sem linha de fonte. */
+  source: string | null;
 };
 
 declare module "@tiptap/core" {
@@ -72,6 +105,64 @@ function formatCell(value: unknown): string {
   return String(value);
 }
 
+/** Coluna de número alinha à direita — é o que faz as casas baterem na leitura. */
+function isNumeric(column: StatSourceColumn): boolean {
+  return column.dataType === "number" || column.dataType === "integer";
+}
+
+/**
+ * Linha de texto da figura (legenda e fonte) editável direto na folha.
+ *
+ * Mesma ideia da tabela escrita à mão: o texto vive num **atributo** do nó, não
+ * no corpo do documento. Aqui, dentro de um nó atômico do TipTap, o React não
+ * pode governar o conteúdo — reescrever a cada tecla jogaria o cursor para o
+ * começo —, então o elemento é solto e só se sincroniza quando não está em foco.
+ */
+function useFigureLine(value: string) {
+  const ref = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || document.activeElement === el) return;
+    if (el.textContent !== value) el.textContent = value;
+    el.classList.toggle("is-empty", value.length === 0);
+  }, [value]);
+
+  return ref;
+}
+
+/** Manipuladores do campo — sem estado, para o elemento ficar solto do React. */
+function figureLineHandlers(onCommit: (text: string) => void) {
+  return {
+    contentEditable: true,
+    suppressContentEditableWarning: true,
+    spellCheck: true,
+    // O bloco inteiro é alça de arraste (`data-drag-handle`): sem isto, apertar
+    // o botão sobre a legenda começaria a arrastar a figura em vez de pôr o
+    // cursor no texto.
+    draggable: false,
+    onMouseDown: (e: MouseEvent<HTMLElement>) => e.stopPropagation(),
+    onInput: (e: FormEvent<HTMLElement>) => {
+      const el = e.currentTarget;
+      el.classList.toggle("is-empty", (el.textContent ?? "").length === 0);
+    },
+    onBlur: (e: FocusEvent<HTMLElement>) =>
+      onCommit((e.currentTarget.textContent ?? "").replace(/\s+/g, " ").trim()),
+    onKeyDown: (e: KeyboardEvent<HTMLElement>) => {
+      if (e.key === "Enter" || e.key === "Escape") {
+        e.preventDefault();
+        e.currentTarget.blur();
+      }
+    },
+    onPaste: (e: ClipboardEvent<HTMLElement>) => {
+      // O que se cola aqui é texto: a legenda é uma string num atributo.
+      e.preventDefault();
+      const text = e.clipboardData.getData("text/plain").replace(/\s+/g, " ");
+      document.execCommand("insertText", false, text);
+    },
+  };
+}
+
 function StatChartView({ node, updateAttributes, deleteNode, editor, selected }: NodeViewProps) {
   const { statId, statType, displaySize } = node.attrs as StatChartAttrs;
   const [source, setSource] = useState<StatSourceData | null>(null);
@@ -110,23 +201,46 @@ function StatChartView({ node, updateAttributes, deleteNode, editor, selected }:
   const editable = editor.isEditable;
   const size = (displaySize ?? "medium") as StatChartSize;
   const isMissing = status === "missing" || !statId;
+  const attrs = node.attrs as StatChartAttrs;
+
+  // A legenda em branco herda o nome da planilha: é o que este bloco já
+  // mostrava, agora em forma de legenda numerada. Escrever por cima substitui.
+  const captionText = attrs.caption ?? source?.name ?? "";
+  const captionRef = useFigureLine(captionText);
+  const sourceRef = useFigureLine(attrs.source ?? "");
 
   return (
     <NodeViewWrapper
-      className={`folium-stat-chart my-6 ${SIZE_CLASS[size]} ${selected ? "is-selected" : ""}`}
+      className={`folium-stat-chart ${SIZE_CLASS[size]} ${selected ? "is-selected" : ""}`}
       data-drag-handle
     >
-      <figure className="group relative rounded-xl border border-border-subtle bg-surface shadow-card">
-        {/* Controles — só no modo edição */}
+      <div
+        className="folium-table-figure group relative"
+        data-preset={attrs.preset}
+        data-density={attrs.density}
+        data-zebra={attrs.zebra ? "1" : "0"}
+        data-width="text"
+        data-align="left"
+        data-caption-placement="top"
+        style={attrs.size ? ({ "--tbl-size": `${attrs.size}pt` } as CSSProperties) : undefined}
+      >
+        {/* Chrome do vínculo — instrumento, não papel: flutua sobre a folha, só
+            aparece no hover e não ocupa espaço (logo, não mexe na paginação). */}
         {editable && (
-          <div className="absolute right-2 top-2 z-10 flex items-center gap-1 rounded-lg border border-border-subtle bg-surface/95 p-1 opacity-0 shadow-card backdrop-blur transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+          <div className="absolute -top-2 right-0 z-10 flex items-center gap-1 rounded-lg border border-border-subtle bg-surface/95 p-1 opacity-0 shadow-card backdrop-blur transition-opacity group-hover:opacity-100 focus-within:opacity-100 print:hidden">
+            {source && (
+              <span className="px-1 font-mono text-[0.6rem] uppercase tracking-[0.1em] text-text-dim">
+                vinculada · {source.rows.length} linhas
+              </span>
+            )}
             {(["small", "medium", "full"] as StatChartSize[]).map((s) => (
               <button
                 key={s}
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => updateAttributes({ displaySize: s })}
                 aria-pressed={size === s}
-                title={`Tamanho ${s === "small" ? "pequeno" : s === "medium" ? "médio" : "grande"}`}
+                title={`Largura ${s === "small" ? "pequena" : s === "medium" ? "média" : "total"}`}
                 className={`grid size-6 place-items-center rounded font-mono text-[0.65rem] transition-colors ${
                   size === s
                     ? "bg-accent-teal-soft text-accent-teal"
@@ -137,8 +251,31 @@ function StatChartView({ node, updateAttributes, deleteNode, editor, selected }:
               </button>
             ))}
             <span className="mx-0.5 h-4 w-px bg-border-subtle" aria-hidden />
+            <Popover
+              align="end"
+              panelClassName="w-64"
+              trigger={({ open, toggle, triggerRef }) => (
+                <button
+                  ref={triggerRef}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={toggle}
+                  title="Estilo da tabela"
+                  className={`grid size-6 place-items-center rounded transition-colors ${
+                    open ? "text-accent-teal" : "text-text-dim hover:text-accent-teal"
+                  }`}
+                >
+                  <Palette size={13} />
+                </button>
+              )}
+            >
+              {(close) => (
+                <StatStylePanel attrs={attrs} update={updateAttributes} close={close} />
+              )}
+            </Popover>
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={refetch}
               title="Atualizar dados"
               className="grid size-6 place-items-center rounded text-text-dim transition-colors hover:text-accent-teal"
@@ -147,6 +284,7 @@ function StatChartView({ node, updateAttributes, deleteNode, editor, selected }:
             </button>
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => deleteNode()}
               title="Remover do documento"
               className="grid size-6 place-items-center rounded text-text-dim transition-colors hover:text-red-600 dark:hover:text-red-400"
@@ -156,93 +294,184 @@ function StatChartView({ node, updateAttributes, deleteNode, editor, selected }:
           </div>
         )}
 
-        <div className="p-4">
-          {status === "loading" && !isMissing && (
-            <div className="flex items-center gap-2 py-8 text-sm text-text-dim">
-              <RefreshCw size={14} className="animate-spin" />
-              Carregando estatística…
-            </div>
-          )}
-
-          {isMissing && (
-            <div className="flex items-start gap-3 rounded-lg border border-dashed border-border-strong bg-surface-dim/60 px-4 py-6 text-sm text-text-dim">
-              <TriangleAlert size={16} className="mt-0.5 shrink-0 text-accent-gold" />
-              <span>
-                Conteúdo removido. A estatística vinculada não existe mais na aba
-                Estatística.
-              </span>
-            </div>
-          )}
-
-          {status === "ready" && source && statType === "chart" && (
-            <div className="flex items-start gap-3 rounded-lg border border-dashed border-border-strong bg-surface-dim/60 px-4 py-6 text-sm text-text-dim">
-              <BarChart3 size={16} className="mt-0.5 shrink-0 text-accent-teal" />
-              <span>Gráficos chegam em breve. Este bloco exibirá “{source.name}”.</span>
-            </div>
-          )}
-
-          {status === "ready" && source && statType !== "chart" && (
-            <StatTable source={source} />
-          )}
-        </div>
-
-        {status === "ready" && source && (
-          <figcaption className="flex items-center gap-2 border-t border-border-subtle px-4 py-2 font-mono text-[0.68rem] uppercase tracking-wide text-text-dim">
-            <Table2 size={12} className="text-accent-teal" />
-            {source.name}
-            <span className="text-text-dim/70">· {source.rows.length} linhas</span>
-          </figcaption>
+        {status === "loading" && !isMissing && (
+          <p className="flex items-center gap-2 py-6 text-sm text-text-dim">
+            <RefreshCw size={14} className="animate-spin" />
+            Carregando estatística…
+          </p>
         )}
-      </figure>
+
+        {isMissing && (
+          <p className="flex items-start gap-3 rounded-lg border border-dashed border-border-strong px-4 py-5 text-sm text-text-dim">
+            <TriangleAlert size={16} className="mt-0.5 shrink-0 text-accent-gold" />
+            <span>
+              Conteúdo removido. A estatística vinculada não existe mais na aba
+              Estatística.
+            </span>
+          </p>
+        )}
+
+        {status === "ready" && source && statType === "chart" && (
+          <p className="flex items-start gap-3 rounded-lg border border-dashed border-border-strong px-4 py-5 text-sm text-text-dim">
+            <BarChart3 size={16} className="mt-0.5 shrink-0 text-accent-teal" />
+            <span>Gráficos chegam em breve. Este bloco exibirá “{source.name}”.</span>
+          </p>
+        )}
+
+        {status === "ready" && source && statType !== "chart" && (
+          <table className="folium-table">
+            <caption
+              ref={captionRef as RefObject<HTMLTableCaptionElement>}
+              className="folium-table-caption"
+              data-label={attrs.label}
+              data-placeholder="Título da tabela"
+              {...figureLineHandlers((text) =>
+                updateAttributes({ caption: text === (source?.name ?? "") ? null : text }),
+              )}
+            />
+            <tbody>
+              <tr>
+                {source.columns.map((col) => (
+                  <th key={col.id} style={isNumeric(col) ? { textAlign: "right" } : undefined}>
+                    {col.name}
+                  </th>
+                ))}
+              </tr>
+              {source.rows.length === 0 ? (
+                <tr>
+                  <td colSpan={Math.max(source.columns.length, 1)} className="text-text-dim">
+                    Sem linhas ainda.
+                  </td>
+                </tr>
+              ) : (
+                source.rows.map((row) => (
+                  <tr key={row.id}>
+                    {source.columns.map((col) => (
+                      <td key={col.id} style={isNumeric(col) ? { textAlign: "right" } : undefined}>
+                        {formatCell(row.data[col.id])}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        )}
+
+        {attrs.source != null && status === "ready" && (
+          <div
+            ref={sourceRef as RefObject<HTMLDivElement>}
+            className="folium-table-source"
+            data-placeholder="Fonte: …"
+            {...figureLineHandlers((text) => updateAttributes({ source: text }))}
+          />
+        )}
+      </div>
     </NodeViewWrapper>
   );
 }
 
-function StatTable({ source }: { source: StatSourceData }) {
-  if (source.columns.length === 0) {
-    return (
-      <p className="py-4 text-sm text-text-dim">Esta planilha ainda não tem colunas.</p>
-    );
-  }
+/** Painel de estilo do bloco vinculado — o mesmo vocabulário da aba "Tabela". */
+function StatStylePanel({
+  attrs,
+  update,
+  close,
+}: {
+  attrs: StatChartAttrs;
+  update: (attrs: Partial<StatChartAttrs>) => void;
+  close: () => void;
+}) {
   return (
-    <div className="overflow-x-auto">
-      <table className="folium-stat-table w-full border-collapse text-sm">
-        <thead>
-          <tr>
-            {source.columns.map((col) => (
-              <th
-                key={col.id}
-                className="border-b border-border-strong px-3 py-2 text-left font-serif font-semibold text-foreground"
-              >
-                {col.name}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {source.rows.length === 0 ? (
-            <tr>
-              <td
-                colSpan={source.columns.length}
-                className="px-3 py-4 text-center text-text-dim"
-              >
-                Sem linhas ainda.
-              </td>
-            </tr>
-          ) : (
-            source.rows.map((row) => (
-              <tr key={row.id} className="border-b border-border-subtle last:border-0">
-                {source.columns.map((col) => (
-                  <td key={col.id} className="px-3 py-1.5 text-foreground tabular-nums">
-                    {formatCell(row.data[col.id])}
-                  </td>
-                ))}
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <MenuLabel>Estilo da tabela</MenuLabel>
+      {TABLE_PRESETS.map((p) => (
+        <MenuItem
+          key={p.value}
+          active={p.value === attrs.preset}
+          onClick={() => {
+            update({ preset: p.value });
+            close();
+          }}
+        >
+          <span className="flex flex-col gap-0.5">
+            <span>{p.label}</span>
+            <span className="text-[0.68rem] leading-snug text-text-dim">{p.hint}</span>
+          </span>
+        </MenuItem>
+      ))}
+
+      <MenuDivider />
+      <MenuLabel>Densidade e corpo</MenuLabel>
+      <div className="flex flex-wrap gap-1 px-2.5 py-1">
+        {TABLE_DENSITIES.map((d) => (
+          <Chip key={d.value} active={attrs.density === d.value} onClick={() => update({ density: d.value })}>
+            {d.label}
+          </Chip>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-1 px-2.5 py-1">
+        {TABLE_SIZES.map((pt) => (
+          <Chip
+            key={pt}
+            active={(attrs.size ?? 10) === pt}
+            onClick={() => update({ size: pt === 10 ? null : pt })}
+          >
+            {pt} pt
+          </Chip>
+        ))}
+      </div>
+
+      <MenuDivider />
+      <MenuItem active={attrs.zebra} onClick={() => update({ zebra: !attrs.zebra })}>
+        Faixa alternada nas linhas
+      </MenuItem>
+      <MenuItem
+        active={attrs.source != null}
+        onClick={() => update({ source: attrs.source == null ? "" : null })}
+      >
+        Linha de fonte embaixo
+      </MenuItem>
+
+      <MenuDivider />
+      <MenuLabel>Rótulo da legenda</MenuLabel>
+      {TABLE_LABELS.map((l) => (
+        <MenuItem
+          key={l.value}
+          active={l.value === attrs.label}
+          onClick={() => {
+            update({ label: l.value });
+            close();
+          }}
+        >
+          {l.label}
+        </MenuItem>
+      ))}
+    </>
+  );
+}
+
+function Chip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClick}
+      className={`rounded-md border px-2 py-0.5 font-mono text-[0.65rem] transition-colors ${
+        active
+          ? "border-accent-teal text-accent-teal"
+          : "border-border-subtle text-text-dim hover:text-foreground"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -275,6 +504,48 @@ export const StatChart = Node.create({
         default: "medium",
         parseHTML: (el) => el.getAttribute("data-display-size") || "medium",
         renderHTML: (attrs) => ({ "data-display-size": attrs.displaySize ?? "medium" }),
+      },
+      // Estilo: o mesmo vocabulário da tabela escrita à mão, para que uma
+      // planilha vinculada e uma tabela digitada saiam iguais no papel.
+      preset: {
+        default: "academic",
+        parseHTML: (el) => el.getAttribute("data-preset") || "academic",
+        renderHTML: (attrs) => ({ "data-preset": attrs.preset ?? "academic" }),
+      },
+      density: {
+        default: "normal",
+        parseHTML: (el) => el.getAttribute("data-density") || "normal",
+        renderHTML: (attrs) => ({ "data-density": attrs.density ?? "normal" }),
+      },
+      zebra: {
+        default: false,
+        parseHTML: (el) => el.getAttribute("data-zebra") === "1",
+        renderHTML: (attrs) => ({ "data-zebra": attrs.zebra ? "1" : "0" }),
+      },
+      size: {
+        default: null,
+        parseHTML: (el) => {
+          const raw = Number(el.getAttribute("data-size"));
+          return Number.isFinite(raw) && raw > 0 ? raw : null;
+        },
+        renderHTML: (attrs) => (attrs.size == null ? {} : { "data-size": String(attrs.size) }),
+      },
+      label: {
+        default: "Tabela",
+        parseHTML: (el) => el.getAttribute("data-label") ?? "Tabela",
+        renderHTML: (attrs) => ({ "data-label": String(attrs.label ?? "") }),
+      },
+      caption: {
+        default: null,
+        parseHTML: (el) => el.getAttribute("data-caption"),
+        renderHTML: (attrs) =>
+          attrs.caption == null ? {} : { "data-caption": String(attrs.caption) },
+      },
+      source: {
+        default: null,
+        parseHTML: (el) => el.getAttribute("data-source"),
+        renderHTML: (attrs) =>
+          attrs.source == null ? {} : { "data-source": String(attrs.source) },
       },
     };
   },

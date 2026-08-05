@@ -10,7 +10,14 @@ export const RIBBON_TABS = [
   "Referências",
 ] as const;
 
-export type RibbonTab = (typeof RIBBON_TABS)[number];
+/**
+ * Abas que só aparecem quando o cursor está dentro do objeto que elas comandam
+ * (a "Ferramentas de Tabela" do Word). Ficam depois de um separador e em
+ * dourado — ver `.fx-tab-ctx` em `app/globals.css`.
+ */
+export const CONTEXTUAL_TABS = ["Tabela"] as const;
+
+export type RibbonTab = (typeof RIBBON_TABS)[number] | (typeof CONTEXTUAL_TABS)[number];
 
 /** Segunda linha do chrome: as abas da faixa + o gatilho de recolher a faixa. */
 export function RibbonTabs({
@@ -18,11 +25,14 @@ export function RibbonTabs({
   onSelect,
   collapsed,
   onToggleCollapsed,
+  contextual = [],
 }: {
   active: RibbonTab;
   onSelect: (tab: RibbonTab) => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  /** Abas contextuais visíveis agora (ex.: "Tabela", com o cursor numa). */
+  contextual?: readonly RibbonTab[];
 }) {
   return (
     <div className="fx-row fx-tabbar print:hidden" role="tablist" aria-label="Faixa de opções">
@@ -34,6 +44,20 @@ export function RibbonTabs({
             role="tab"
             aria-selected={tab === active}
             className="fx-tab"
+            onClick={() => onSelect(tab)}
+          >
+            {tab}
+          </button>
+        ))}
+
+        {contextual.length > 0 && <span className="fx-tab-ctx-sep" aria-hidden />}
+        {contextual.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={tab === active}
+            className="fx-tab fx-tab-ctx"
             onClick={() => onSelect(tab)}
           >
             {tab}

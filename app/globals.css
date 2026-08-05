@@ -546,7 +546,7 @@ textarea.input { min-height: 90px; resize: vertical; }
 .folium-editor > pre,
 .folium-editor > hr,
 .folium-editor > img,
-.folium-editor > .tableWrapper { margin-top: 4pt; margin-bottom: 8pt; }
+.folium-editor > .tableWrapper { margin-top: 6pt; margin-bottom: 10pt; }
 /* o espaçador da paginação é vão puro: margem nenhuma, senão a medição oscila */
 .folium-editor > .folium-page-spacer { margin: 0; }
 
@@ -677,6 +677,22 @@ textarea.input { min-height: 90px; resize: vertical; }
   font-weight: 600;
   color: var(--fx-teal);
   box-shadow: inset 0 -2px 0 var(--fx-teal);
+}
+/* Aba contextual ("Tabela"): só existe enquanto o cursor está dentro do objeto.
+   Vem em dourado para não se confundir com as abas fixas — é a mesma convenção
+   do Word, e aqui o dourado já é a cor do "manuscrito". */
+.fx-tab-ctx { color: color-mix(in srgb, var(--fx-gold) 78%, transparent); }
+.fx-tab-ctx:hover { color: var(--fx-gold); }
+.fx-tab-ctx[aria-selected="true"] {
+  color: var(--fx-gold);
+  box-shadow: inset 0 -2px 0 var(--fx-gold);
+}
+.fx-tab-ctx-sep {
+  align-self: center;
+  width: 1px;
+  height: 14px;
+  margin: 0 6px;
+  background: var(--fx-line-strong);
 }
 
 /* faixa agrupada */
@@ -1345,19 +1361,150 @@ textarea.input { min-height: 90px; resize: vertical; }
    numeração automática: o número de página é o token `{n}` do rodapé. */
 .folium-page-overlay { position: absolute; inset: 0; pointer-events: none; }
 
-/* tabelas */
-.folium-editor .tableWrapper { overflow-x: auto; margin: 1em 0; }
-.folium-editor table {
-  border-collapse: collapse; width: 100%; table-layout: fixed; margin: 0;
+/* ── tabelas ──────────────────────────────────────────────────────────────
+   Uma tabela de revista não é um card: não tem moldura em volta, fundo chapado
+   no cabeçalho nem grade fechada. O padrão daqui é o das ciências (o "booktabs"
+   do LaTeX, que a maioria dos periódicos pede): **três réguas horizontais** —
+   topo, sob o cabeçalho, base —, **nenhuma vertical**, corpo menor que o do
+   texto, números na mesma coluna (tabular-nums), legenda numerada em cima e a
+   linha de fonte embaixo.
+
+   Os presets (`data-preset`) trocam **só** as réguas; espaço, corpo e legenda
+   são comuns a todos. Os atributos saem do nó `table` e são escritos no DOM
+   pela `FoliumTableView` (ver `lib/writing/extensions/table.ts`). */
+
+/* Numeração automática da legenda: "Tabela 3" é a terceira tabela do
+   documento, e o número se refaz sozinho quando outra entra no meio. */
+.folium-editor { counter-reset: folium-table; }
+
+.folium-editor .tableWrapper { overflow-x: auto; }
+.folium-editor .folium-table-figure {
+  counter-increment: folium-table;
+  --tbl-ink: var(--color-text);
+  --tbl-size: 10pt;
+  --tbl-pad-y: 3pt;
+  --tbl-pad-x: 6pt;
+  --tbl-rule-strong: 1.4px solid color-mix(in srgb, var(--tbl-ink) 85%, transparent);
+  --tbl-rule-mid: 1px solid color-mix(in srgb, var(--tbl-ink) 60%, transparent);
+  --tbl-rule-hair: 1px solid color-mix(in srgb, var(--tbl-ink) 18%, transparent);
 }
-.folium-editor td, .folium-editor th {
-  border: 1px solid var(--color-divider); padding: 6px 10px;
-  vertical-align: top; position: relative; min-width: 3em;
+.folium-editor .folium-table-figure[data-density="compact"] {
+  --tbl-pad-y: 1.5pt; --tbl-pad-x: 5pt;
 }
-.folium-editor th {
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
-  font-weight: 600; text-align: left; font-family: var(--font-heading);
+.folium-editor .folium-table-figure[data-density="loose"] {
+  --tbl-pad-y: 6pt; --tbl-pad-x: 8pt;
 }
+
+.folium-editor .folium-table {
+  border-collapse: collapse; table-layout: fixed; width: 100%; margin: 0;
+  font-size: var(--tbl-size); line-height: 1.32;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.folium-editor .folium-table-figure[data-width="auto"] .folium-table {
+  width: auto; table-layout: auto;
+}
+.folium-editor .folium-table-figure[data-align="center"] .folium-table { margin-inline: auto; }
+
+.folium-editor .folium-table td,
+.folium-editor .folium-table th {
+  border: 0; padding: var(--tbl-pad-y) var(--tbl-pad-x);
+  vertical-align: top; text-align: left; position: relative; min-width: 2.5em;
+}
+/* O `prose` do Tailwind desenha um filete embaixo de **cada linha** (`tbody tr`,
+   e não nas células). Sem zerar isto, toda tabela nasce com régua em cada linha:
+   o preset científico saía igual ao de linhas horizontais e trocar de preset
+   parecia não fazer nada. Dentro da figura, quem manda nas réguas é o preset. */
+.folium-editor .folium-table tr,
+.folium-editor .folium-table thead,
+.folium-editor .folium-table tbody { border: 0; }
+/* Dentro da célula o parágrafo *é* a célula: as margens do corpo do texto
+   viravam um vão enorme dentro de uma caixa de 10 pt. */
+.folium-editor .folium-table td > p,
+.folium-editor .folium-table th > p { margin: 0; }
+.folium-editor .folium-table td > p ~ p,
+.folium-editor .folium-table th > p ~ p { margin-top: 3pt; }
+.folium-editor .folium-table th { font-weight: 600; }
+
+/* Científica — as três réguas. "Linha de cabeçalho" é a linha em que *todas* as
+   células são `th`; assim uma coluna-título (um `th` abrindo cada linha) não
+   desenha régua embaixo de cada linha da tabela. */
+.folium-editor [data-preset="academic"] .folium-table {
+  border-top: var(--tbl-rule-strong); border-bottom: var(--tbl-rule-strong);
+}
+.folium-editor [data-preset="academic"] .folium-table tr:not(:has(> td)) > * {
+  border-bottom: var(--tbl-rule-mid);
+}
+
+/* Linhas horizontais — para tabelas longas, em que o olho se perde na travessia. */
+.folium-editor [data-preset="lines"] .folium-table {
+  border-top: var(--tbl-rule-strong); border-bottom: var(--tbl-rule-strong);
+}
+.folium-editor [data-preset="lines"] .folium-table tr:not(:last-child) > * {
+  border-bottom: var(--tbl-rule-hair);
+}
+.folium-editor [data-preset="lines"] .folium-table tr:not(:has(> td)) > * {
+  border-bottom: var(--tbl-rule-mid);
+}
+
+/* Quadro fechado — o "quadro" da ABNT, quando a norma pede moldura. */
+.folium-editor [data-preset="grid"] .folium-table { border: var(--tbl-rule-mid); }
+.folium-editor [data-preset="grid"] .folium-table td,
+.folium-editor [data-preset="grid"] .folium-table th { border: var(--tbl-rule-hair); }
+.folium-editor [data-preset="grid"] .folium-table tr:not(:has(> td)) > * {
+  border-bottom: var(--tbl-rule-mid);
+}
+
+/* Aberta — nenhuma régua; o cabeçalho se separa por peso e por respiro. */
+.folium-editor [data-preset="open"] .folium-table tr:not(:has(> td)) > * {
+  padding-bottom: calc(var(--tbl-pad-y) + 3pt);
+}
+
+/* Estatística vinculada (`statChart`): é a **mesma figura** de tabela — as
+   regras acima valem inteiras para ela. Muda só o que vem do fato de os dados
+   virem de uma planilha: as colunas se ajustam ao conteúdo (não há colgroup
+   arrastável) e o bloco tem o vão de papel dos outros blocos. */
+.folium-editor > .folium-stat-chart { margin-top: 6pt; margin-bottom: 10pt; }
+.folium-editor .folium-stat-chart .folium-table { table-layout: auto; }
+
+/* Faixa alternada: tinta a 4%, o suficiente para guiar a leitura sem virar cor. */
+.folium-editor [data-zebra="1"] .folium-table tr:nth-of-type(even) > td {
+  background: color-mix(in srgb, var(--tbl-ink) 4.5%, transparent);
+}
+
+/* Legenda e fonte — atributos da tabela, editáveis direto na folha. O número
+   vem do contador; o rótulo ("Tabela", "Quadro", "Table") é escolha do autor. */
+.folium-editor .folium-table-caption {
+  caption-side: top; text-align: left;
+  font-family: var(--font-body); font-size: var(--tbl-size); line-height: 1.35;
+  color: var(--color-text); padding: 0 0 3pt; outline: none;
+}
+.folium-editor [data-caption-placement="bottom"] .folium-table-caption {
+  caption-side: bottom; padding: 3pt 0 0;
+}
+.folium-editor .folium-table-caption::before {
+  content: attr(data-label) " " counter(folium-table) " — ";
+  font-weight: 600; white-space: pre;
+}
+.folium-editor .folium-table-caption[data-label=""]::before { content: none; }
+.folium-editor .folium-table-source {
+  margin-top: 3pt; font-family: var(--font-body);
+  font-size: calc(var(--tbl-size) * 0.92); line-height: 1.3;
+  color: color-mix(in srgb, var(--color-text) 68%, transparent); outline: none;
+}
+/* Campo em branco mostra a dica no lugar do texto — ocupa a mesma caixa, então
+   a paginação medida não muda quando a pessoa começa a escrever. */
+.folium-editor .folium-table-caption.is-empty::after,
+.folium-editor .folium-table-source.is-empty::after {
+  content: attr(data-placeholder);
+  color: color-mix(in srgb, var(--color-text) 35%, transparent);
+  font-style: italic;
+}
+.folium-editor .folium-table-caption:focus,
+.folium-editor .folium-table-source:focus {
+  background: color-mix(in srgb, var(--color-accent-teal) 9%, transparent);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--color-accent-teal) 45%, transparent);
+}
+
 .folium-editor .selectedCell::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background: color-mix(in srgb, var(--color-accent) 14%, transparent);
@@ -1625,6 +1772,11 @@ textarea.input { min-height: 90px; resize: vertical; }
   .folium-print .folium-seam { display: none !important; }
   .folium-print .folium-page-break { border-top-color: transparent !important; }
   .folium-print .folium-page-break::after { display: none !important; }
+
+  /* A dica de legenda vazia não se imprime — mas continua ocupando a mesma
+     caixa (só some da vista), senão o recorte da folha sairia do lugar. */
+  .folium-print .folium-table-caption.is-empty::after,
+  .folium-print .folium-table-source.is-empty::after { visibility: hidden !important; }
 }
 
 /* ─────────────────────  transição de tema (claro↔escuro)  ────────────
