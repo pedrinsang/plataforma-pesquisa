@@ -104,6 +104,8 @@ export function DocumentEditor({
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving">("saved");
   const [tab, setTab] = useState<RibbonTab>("Início");
   const [ribbonCollapsed, setRibbonCollapsed] = useState(false);
+  // A aba "Tabela" é contextual: existe enquanto o cursor está dentro de uma.
+  const [inTable, setInTable] = useState(false);
   // Um painel por trilho: dá para consultar o sumário e a biblioteca ao mesmo
   // tempo, um de cada lado da folha.
   const [rightPanel, setRightPanel] = useState<RightPanel | null>(null);
@@ -160,10 +162,18 @@ export function DocumentEditor({
       setWordCount(countWords(text));
       setCharCount(text.length);
     },
-    onUpdate: ({ editor }) => handleEditorUpdate(editor.getJSON(), editor.getText()),
+    onUpdate: ({ editor }) => {
+      handleEditorUpdate(editor.getJSON(), editor.getText());
+      setInTable(editor.isActive("table"));
+    },
+    onSelectionUpdate: ({ editor }) => setInTable(editor.isActive("table")),
   });
 
   useEffect(() => () => editor?.destroy(), [editor]);
+
+  // Sair da tabela não pode deixar a faixa numa aba que não existe mais: a
+  // escolha do usuário fica guardada, mas a faixa mostrada volta para o Início.
+  const activeTab: RibbonTab = tab === "Tabela" && !inTable ? "Início" : tab;
 
   // O shell ocupa a viewport inteira: trava a rolagem da página por baixo.
   useEffect(() => {
@@ -378,23 +388,25 @@ export function DocumentEditor({
       />
 
       <RibbonTabs
-        active={tab}
+        active={activeTab}
         onSelect={(next) => {
           setTab(next);
           setRibbonCollapsed(false);
         }}
         collapsed={ribbonCollapsed}
         onToggleCollapsed={() => setRibbonCollapsed((v) => !v)}
+        contextual={inTable ? ["Tabela"] : []}
       />
 
       {editor && !ribbonCollapsed && (
         <Ribbon
           editor={editor}
-          tab={tab}
+          tab={activeTab}
           projectId={projectId}
           linkOpenSignal={linkOpenSignal}
           onInsertStat={() => setRightPanel("stats")}
           onOpenReferences={() => setRightPanel("references")}
+          onTableInserted={() => setTab("Tabela")}
           citationStyle={citationStyle}
           onGenerateBibliography={(scope) => void generateBibliography(scope)}
           onFind={() => setSearch({ open: true, replace: false })}

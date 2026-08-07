@@ -46,7 +46,8 @@ import { BibliographyPanel } from "./BibliographyPanel";
 import { ColorPanel } from "./ColorPanel";
 import { LinkPanel } from "./LinkPanel";
 import { ImagePanel } from "./ImagePanel";
-import { TableMenu } from "./TableMenu";
+import { TableInsertMenu } from "./TableInsertMenu";
+import { TableTools } from "./TableTools";
 import { FontSizeStepper } from "./FontSizeStepper";
 import {
   RibbonBigButton,
@@ -95,6 +96,8 @@ export type RibbonProps = {
   onInsertStat: () => void;
   /** Abre a biblioteca de referências no trilho da direita. */
   onOpenReferences: () => void;
+  /** Uma tabela acabou de nascer — a faixa vai para a aba contextual dela. */
+  onTableInserted?: () => void;
   /** Norma do documento — define a forma das entradas da bibliografia. */
   citationStyle: CitationStyle;
   /** Escreve (ou reescreve) a lista de referências no fim do documento. */
@@ -454,7 +457,9 @@ export function Ribbon(props: RibbonProps) {
                 </button>
               )}
             >
-              {(close) => <TableMenu editor={editor} close={close} />}
+              {(close) => (
+                <TableInsertMenu editor={editor} close={close} onInserted={props.onTableInserted} />
+              )}
             </Popover>
 
             <Popover
@@ -635,6 +640,8 @@ export function Ribbon(props: RibbonProps) {
           </RibbonGroup>
         </>
       )}
+
+      {tab === "Tabela" && s.table && <TableTools editor={editor} />}
 
       {tab === "Referências" && (
         <RibbonGroup label="Biblioteca" gap={4}>

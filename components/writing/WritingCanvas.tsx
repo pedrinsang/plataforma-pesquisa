@@ -924,9 +924,17 @@ export function WritingCanvas({
   const stackH = stackHeight(pageCount);
 
   // Clicar no papel fora do texto foca o fim do documento (estilo Word).
+  //
+  // A primeira condição não é zelo: os **portais do React sobem pela árvore de
+  // componentes, não pelo DOM**. Os menus dos nós da folha (a paleta de estilo da
+  // estatística embutida, por exemplo) são portais abertos de dentro do editor,
+  // que por sua vez está dentro desta pilha — sem a guarda, clicar num item
+  // desses menus caía aqui, o alvo não estava no fluxo do texto e o cursor ia
+  // parar no fim do documento, arrastando a rolagem junto.
   function focusEnd(e: React.MouseEvent) {
-    const target = e.target as HTMLElement;
-    if (!editor || flowRef.current?.contains(target)) return;
+    const target = e.target as Node;
+    const stack = stackRef.current;
+    if (!editor || !stack?.contains(target) || flowRef.current?.contains(target)) return;
     editor.chain().focus("end").run();
   }
 

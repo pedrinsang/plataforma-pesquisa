@@ -170,6 +170,76 @@ não dependemos do CORS do Storage nem entregamos a URL assinada ao cliente.
 Link/DOI externo continua em `<iframe>` — é outra origem, a seleção não é
 legível, e o rodapé do leitor diz isso em vez de deixar o usuário tentando.
 
+Feito também: **tabela de revista**. A tabela do TipTap entrava no texto como um
+card — moldura em volta, cabeçalho com fundo petróleo, grade fechada —, que é o
+oposto do que um periódico aceita. Agora o padrão é o das ciências (o "booktabs"
+do LaTeX): **três réguas horizontais** (topo, sob o cabeçalho, base), **nenhuma
+vertical**, nenhum preenchimento, corpo de 10 pt e números em `tabular-nums`.
+O desenho é atributo do nó `table` (`lib/writing/extensions/table.ts` +
+`lib/writing/table-style.ts`), não classe solta: preset de réguas (científica ·
+linhas horizontais · quadro fechado da ABNT · aberta), faixa alternada,
+densidade, corpo em pontos, largura (coluna do texto ou ajustada ao conteúdo) e
+alinhamento na página. Como o documento é gravado em **JSON**, tudo isso
+sobrevive à releitura; o `renderHTML`/`parseHTML` em `data-*` faz o mesmo para
+copiar e colar.
+A **legenda é da tabela**, não um parágrafo solto acima dela: `caption` e
+`source` são atributos, desenhados pela `FoliumTableView` como `<caption>` e uma
+linha de fonte, e o número ("Tabela 3") sai de um **contador de CSS** — entra
+sozinho e se refaz quando outra tabela nasce antes. `null` nesses atributos
+significa "esta tabela não tem legenda" (o elemento nem existe) e `""` significa
+"tem, e está em branco" — é o que evita reservar uma linha vazia em toda tabela
+e ainda assim mostrar a dica de preenchimento. Os dois campos são editáveis
+**direto na folha**, embora fiquem fora do `contentDOM`: `ignoreMutation` faz o
+ProseMirror ignorar o que o navegador escreve ali e `stopEvent` impede que ele
+trate as teclas como do documento; o texto volta por `setNodeMarkup` (logo, entra
+no histórico e no autosave). A visão precisa achar a própria posição por
+`posAtDOM` porque o `columnResizing` do prosemirror-tables constrói a `View` com
+três argumentos — **sem** `getPos` e sem os `HTMLAttributes` do `renderHTML`, e é
+por isso que quem escreve os `data-*` no DOM é a classe, não o schema.
+A **estatística embutida** (`statChart`) seguiu junto: era um card (moldura
+arredondada, `figcaption` em versalete com o nome da planilha) e agora é a
+**mesma figura** — as classes `.folium-table-figure`/`.folium-table`, os mesmos
+presets e a mesma legenda numerada, entrando na mesma contagem de "Tabela N" que
+as tabelas escritas à mão. A legenda em branco herda o nome da planilha (é o que
+o bloco já mostrava), e escrever por cima substitui; as colunas de `number`/
+`integer` alinham à direita sozinhas. O chrome do vínculo (largura P/M/G,
+estilo, atualizar, remover, "vinculada · N linhas") virou uma barra flutuante que
+só aparece no hover — é **absoluta**, então não ocupa espaço nem mexe na
+paginação, e some na impressão. Como o bloco inteiro é alça de arraste
+(`data-drag-handle`), os campos de legenda param o `mousedown`: sem isso, clicar
+na legenda arrastaria a figura em vez de pôr o cursor no texto.
+
+Uma segunda armadilha, esta na rolagem: `focusEnd` do `WritingCanvas` ("clicar no
+papel fora do texto põe o cursor no fim", como no Word) escuta o `mousedown` da
+pilha de folhas — e **portais do React sobem pela árvore de componentes, não pelo
+DOM**. A paleta de estilo da estatística embutida é um portal aberto de dentro do
+editor, que está dentro da pilha: clicar num item do menu caía no `focusEnd`, o
+alvo não estava no fluxo do texto e o cursor ia para o fim do documento, levando
+a rolagem junto. Por isso o `focusEnd` exige que o alvo esteja **de fato dentro
+da pilha** (`stackRef.contains`) antes de qualquer coisa. Vale para qualquer menu
+novo que nasça dentro da folha.
+
+Uma armadilha custou a primeira versão inteira: o `prose` do Tailwind desenha um
+filete embaixo de **cada linha** (`tbody tr`, e não nas células). Com ele de pé,
+toda tabela nascia com régua em cada linha — o preset científico saía idêntico ao
+de linhas horizontais e **trocar de preset parecia não fazer nada**. Por isso
+`.folium-editor .folium-table tr` zera a borda: dentro da figura, quem manda nas
+réguas é o preset, e nada mais. Ao mexer nas tabelas, testar sempre com as
+classes reais do editor (`folium-editor prose prose-zinc prose-lg …`), senão o
+`prose` fica invisível no teste e aparece no app.
+
+Os comandos ficam numa **aba contextual "Tabela"** (dourada, ao lado das abas
+fixas — só existe com o cursor dentro de uma tabela; `CONTEXTUAL_TABS` em
+`RibbonTabs`, conteúdo em `ribbon/TableTools.tsx`), e "Inserir ▸ Tabela" virou a
+grade de escolher o tamanho (`ribbon/TableInsertMenu.tsx`), que já abre a legenda
+em branco. O alinhamento é **por coluna** (`setTableColumnAlign` percorre a
+coluna pelo `TableMap`): ninguém alinha 40 células à mão para pôr os números à
+direita. Duas regras do CSS não devem ser desfeitas: a régua do cabeçalho sai de
+`tr:not(:has(> td))` — "linha em que *todas* as células são `th`" —, senão uma
+coluna-título desenharia régua embaixo de cada linha; e o parágrafo dentro da
+célula tem margem zero, porque as margens do corpo do texto viravam um vão
+enorme dentro de uma caixa de 10 pt.
+
 Feito também: **bibliografia gerada** no documento. O botão "Bibliografia" da
 faixa Referências abre um painel com dois escopos — **obras citadas no texto**
 (lidas dos nós de citação, na ordem em que aparecem) ou **a biblioteca inteira do

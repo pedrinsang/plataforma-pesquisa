@@ -10,7 +10,13 @@ import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
 import TextAlign from "@tiptap/extension-text-align";
 import Image from "@tiptap/extension-image";
-import { TableKit } from "@tiptap/extension-table";
+import { TableRow } from "@tiptap/extension-table";
+import {
+  FoliumTable,
+  FoliumTableCell,
+  FoliumTableHeader,
+  FoliumTableView,
+} from "@/lib/writing/extensions/table";
 import { LineHeight } from "@/lib/writing/extensions/line-height";
 import { ParagraphSpacing } from "@/lib/writing/extensions/paragraph-spacing";
 import { Indent } from "@/lib/writing/extensions/indent";
@@ -87,7 +93,12 @@ export function buildEditorExtensions({ projectId }: { projectId?: string } = {}
     Superscript,
     TextAlign.configure({ types: ["heading", "paragraph"] }),
     Image.configure({ inline: false, allowBase64: false }),
-    TableKit.configure({ table: { resizable: true } }),
+    // Sem o `TableKit`: a tabela da Escrita tem legenda, preset de réguas e uma
+    // visão própria (`FoliumTableView`), então as quatro peças entram uma a uma.
+    FoliumTable.configure({ resizable: true, View: FoliumTableView }),
+    TableRow,
+    FoliumTableHeader,
+    FoliumTableCell,
     LineHeight,
     ParagraphSpacing,
     Indent,
