@@ -33,7 +33,12 @@ export async function proxy(request: NextRequest) {
 
   const isPublicPath =
     PUBLIC_PATHS.some((path) => request.nextUrl.pathname.startsWith(path)) ||
-    request.nextUrl.pathname.startsWith("/forms/");
+    request.nextUrl.pathname.startsWith("/forms/") ||
+    // Bancos de ensaio (`/dev/...`): reproduzem defeitos de layout com documento
+    // fixo e **sem nada do usuário**, então rodam sem sessão de propósito — pedir
+    // login para medir paginação só atrapalharia. A porta é dupla: aqui o desvio
+    // só é dispensado fora de produção, e a própria rota devolve 404 lá.
+    (process.env.NODE_ENV !== "production" && request.nextUrl.pathname.startsWith("/dev/"));
 
   if (!user && !isPublicPath && request.nextUrl.pathname !== "/") {
     const redirectUrl = request.nextUrl.clone();

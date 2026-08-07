@@ -111,9 +111,26 @@ com vão real entre elas e **paginação por medição** (`extensions/pagination
 + `planPages` no `WritingCanvas`), e a quebra de página explícita consome o
 resto da folha de verdade. A paginação é **por linha, não por bloco**: um
 parágrafo longo é **repartido entre duas folhas** como num processador de texto,
-com controle de viúvas e órfãs (`MIN_LINES = 2`) contado **por parágrafo** — numa
-lista, cada item conta por si, e o item que não consegue deixar duas linhas dos
-dois lados desce inteiro. Títulos têm **"manter com o próximo"**
+com **controle de viúvas e órfãs opcional**, contado por parágrafo — numa lista,
+cada item conta por si. Opcional porque o rigor tem preço: exigindo `MIN_LINES =
+2` do mesmo parágrafo dos dois lados da virada, um parágrafo de **três linhas ou
+menos não tem corte possível** e só pode descer inteiro, então o texto salta três
+linhas de uma vez em vez de andar uma (e um título com "manter com o próximo"
+desce levando as duas primeiras linhas do que ele abre — três de novo). Isso foi
+relatado como defeito, e é: não da regra, mas de ela estar imposta. Agora é
+`PageSetup.widowControl`, botão na faixa Layout (`PageSetupControl`), **desligado
+por padrão** — desligado o mínimo é 1 e a quebra anda linha a linha; a
+predefinição ABNT liga junto com as margens e a entrelinha. Medido no banco de
+ensaio com parágrafos de 3 linhas: desligado o maior salto é **1 linha**, ligado
+é 2–3. A decisão vive em `breakAtLine`
+(`lib/writing/pagination-rules.ts`), fora do canvas para poder ser testada
+(`scripts/test-pagination-rules.mjs`), e são **duas tentativas, nesta ordem**:
+primeiro **sobe a quebra** para `paraEnd - MIN_LINES`, e só se nem assim sobrarem
+duas linhas em cima é que o parágrafo inteiro desce. A primeira tentativa
+faltava, e era um defeito visível: um parágrafo de 4 linhas com espaço para 3
+caía direto no "desce inteiro" (cortar na linha 3 deixaria uma órfã embaixo), de
+modo que a quebra, em vez de andar uma linha, saltava as quatro para a folha
+seguinte. Títulos têm **"manter com o próximo"**
 (`KEEP_WITH_NEXT`): um título não termina a folha sozinho, desce junto com o
 bloco que ele abre. O rodapé não tem mais numeração automática — quem quer número
 de página escreve `{n}`/`{total}` no rodapé (`HeaderFooterControl`).
@@ -223,12 +240,27 @@ Duas migrations novas da conformidade ABNT também esperam `npx supabase db push
 `20260806130000_document_page_setup` (margens e `line_height` em `documents`). A
 segunda é tolerante como a do cabeçalho; a **primeira não** — o `select` da aba
 Referências lista as colunas por nome e falha enquanto elas não existirem.
+Uma terceira espera `push`: `20260807120000_document_widow_control`
+(`widow_control` em `documents`). Ela tem `select` **próprio** na página do
+documento, e não entrou junto com o das margens de propósito: uma coluna
+faltando derrubaria a leitura das duas coisas, e o documento abriria com a
+margem errada em vez de só com o controle desligado.
 A paginação é **medida no cliente** (não é do ProseMirror): `WritingCanvas` lê a
 geometria e manda espaçadores para a extensão `foliumPagination`, que os desenha
 como widget decorations. São **dois tipos** de espaçador (`PageSpacer.inline`):
 um `div` entre blocos, que desce o bloco inteiro, e um `span` da largura da
 coluna **dentro** do parágrafo (`.folium-line-spacer`), que reparte o parágrafo
-sem que ele deixe de ser um único nó do documento. Por isso a medição desce ao
+sem que ele deixe de ser um único nó do documento. Esse segundo é **float**, e
+não `inline-block`: a altura do caret é a da caixa de linha em que ele está, e um
+inline-block de 220 px formava uma caixa de linha de 220 px — o cursor virava um
+traço que ia do fim do parágrafo, atravessava o vão entre as folhas e entrava na
+de baixo, encostado na margem direita (que é onde o caret cai depois de um
+inline-block de 100% de largura). `display: block` resolveria o caret do mesmo
+jeito, mas parte o parágrafo em caixas anônimas e o texto depois da virada
+receberia **de novo** o recuo de primeira linha do `ParagraphIndent` — que é o
+recuo que a ABNT usa no corpo. O float sai do fluxo em linha sem criar caixa
+anônima, e a geometria da virada não muda (conferido no banco de ensaio: a
+primeira linha depois do vão cai exatamente em `sheetTop(1) + margem`). Por isso a medição desce ao
 nível da linha: `readLines` monta as caixas de linha com `Range.getClientRects()`
 e ancora a virada com `view.posAtCoords`. Duas regras vieram das listas e não
 devem ser desfeitas. Primeira: os retângulos saem de um `Range` sobre **cada nó
@@ -270,9 +302,26 @@ idêntico (o navegador pode devolver a caixa com altura de linha, e o ProseMirro
 insere separadores invisíveis ao lado de um widget). Por fim, `paginate` compara
 com o estado **do plugin** (não com uma cópia local) e guarda a assinatura dos
 planos já tentados desde a última mudança de conteúdo: repetir uma assinatura é
-ciclo (aplicar A leva a medir B, e B de volta a A) e a paginação congela no
-desenho atual em vez de piscar — era esse ciclo que também disparava o
-"Maximum update depth exceeded" do React, uma volta por `setState`.
+ciclo (aplicar A leva a medir B, e B de volta a A) — era esse ciclo que também
+disparava o "Maximum update depth exceeded" do React, uma volta por `setState`.
+Reconhecido o ciclo, a paginação **não congela onde parou**: escolhe entre os
+planos já tentados o de menos páginas (empate: assinatura menor, que não
+significa nada mas é estável) e aplica **esse**, uma vez — `bestAttempt`. Parar
+no plano que estivesse aplicado deixava a escolha ao acaso da passada em que o
+ciclo foi notado, e era isso que fazia o desenho ficar preso no plano perdedor
+depois de um Backspace, com o texto já desfeito. Reaplicar o mesmo plano é
+inócuo (o plugin devolve o valor anterior quando os espaçadores são iguais),
+então a passada seguinte cai no `sameSpacers` e assenta.
+
+Quem torna tudo isso verificável é o **banco de ensaio** `/dev/pagination`
+(`app/dev/pagination`, fixtures em `lib/writing/dev-fixtures.ts`): monta o mesmo
+`WritingCanvas` sobre documentos fixos, **sem projeto e sem sessão** — a rota é
+pública fora de produção (`proxy.ts`) e devolve 404 em produção. Ao lado da
+folha ele mostra o rastro da medição (`onDiagnostics`): passadas por tecla,
+plano em vigor e o aviso de ciclo. Existe porque nenhum desses defeitos deixa
+rastro na tela além do piscar, e reproduzi-los num documento de verdade dependia
+de acertar o texto por tentativa. Medido ali: os quatro fixtures convergem, 1–2
+passadas por tecla, nenhuma linha de texto caindo dentro do vão entre folhas.
 A tipografia da folha é medida em **unidades de papel**
 (`lib/writing/typography.ts`): a folha é A4 a 96 dpi, as mesmas medidas do Word,
 então o tamanho de fonte é gravado em `pt` (`setFontSize("12pt")`) e o corpo

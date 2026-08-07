@@ -60,15 +60,43 @@ export function pageGeometry(margins: PageMargins = DEFAULT_MARGINS): PageGeomet
 export const DEFAULT_GEOMETRY = pageGeometry(DEFAULT_MARGINS);
 
 /**
- * Configuração de página de um documento: margens e entrelinha do corpo.
+ * Configuração de página de um documento: margens, entrelinha do corpo e
+ * controle de linhas viúvas e órfãs.
+ *
  * `lineHeight: null` é a entrelinha padrão do editor — documento escrito antes
  * de isto existir abre exatamente como estava, e só quem escolhe um valor tem
  * um valor gravado.
+ *
+ * `widowControl` **nasce desligado**. Ligado, ele exige duas linhas do mesmo
+ * parágrafo de cada lado da virada, e a consequência é que um parágrafo de três
+ * linhas ou menos não tem corte possível: ele desce inteiro, e o texto salta
+ * três linhas de uma vez em vez de andar uma. Desligado, a quebra anda linha a
+ * linha, ao preço de o parágrafo poder deixar uma linha solta no pé ou no topo
+ * da folha. É a mesma escolha que um processador de texto oferece; aqui o padrão
+ * é a quebra suave, e quem precisa do rigor da norma liga na faixa Layout.
  */
-export type PageSetup = { margins: PageMargins; lineHeight: number | null };
+export type PageSetup = {
+  margins: PageMargins;
+  lineHeight: number | null;
+  widowControl: boolean;
+};
 
-/** Folha conforme a ABNT NBR 14724:2024: margens do anverso e entrelinha 1,5. */
-export const ABNT_PAGE_SETUP: PageSetup = { margins: ABNT_MARGINS, lineHeight: 1.5 };
+/**
+ * Folha conforme a ABNT NBR 14724:2024: margens do anverso e entrelinha 1,5 —
+ * com o controle de viúvas e órfãs ligado, que é o que uma banca espera ver.
+ */
+export const ABNT_PAGE_SETUP: PageSetup = {
+  margins: ABNT_MARGINS,
+  lineHeight: 1.5,
+  widowControl: true,
+};
+
+/** Configuração de um documento novo: folha equilibrada e quebra suave. */
+export const DEFAULT_PAGE_SETUP: PageSetup = {
+  margins: DEFAULT_MARGINS,
+  lineHeight: null,
+  widowControl: false,
+};
 
 /** Largura útil de texto na folha padrão. */
 export const CONTENT_WIDTH_PX = DEFAULT_GEOMETRY.contentWidth;

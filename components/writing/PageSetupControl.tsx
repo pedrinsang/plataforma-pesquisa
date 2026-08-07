@@ -130,6 +130,11 @@ export function PageSetupControl({
                         // Escolher "ABNT" e continuar fora de norma no
                         // espacejamento seria meia conformidade.
                         lineHeight: preset.label === "ABNT" ? 1.5 : setup.lineHeight,
+                        // Pelo mesmo motivo a predefinição liga o controle de
+                        // viúvas e órfãs: linha solta no pé da folha é o tipo de
+                        // coisa que uma banca aponta.
+                        widowControl:
+                          preset.label === "ABNT" ? true : setup.widowControl,
                       })
                     }
                     className={cn(
@@ -183,6 +188,28 @@ export function PageSetupControl({
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="space-y-1.5 border-t border-border-subtle pt-2.5">
+            <span className="block font-mono text-[0.62rem] uppercase tracking-[0.14em] text-text-dim">
+              Quebra de página
+            </span>
+            <label className="flex cursor-pointer items-start gap-2">
+              <input
+                type="checkbox"
+                checked={setup.widowControl}
+                onChange={(e) => onChange({ ...setup, widowControl: e.target.checked })}
+                className="mt-0.5 accent-[var(--color-accent)]"
+              />
+              <span className="text-[0.72rem] leading-snug text-foreground">
+                Controle de linhas viúvas e órfãs
+                <span className="mt-0.5 block text-[0.68rem] leading-relaxed text-text-dim">
+                  {setup.widowControl
+                    ? "Nenhum parágrafo deixa uma linha sozinha no pé ou no topo da folha. Em troca, um parágrafo de até três linhas desce inteiro para a página seguinte."
+                    : "A quebra anda linha a linha. Um parágrafo pode deixar uma linha sozinha no pé ou no topo da folha."}
+                </span>
+              </span>
+            </label>
           </div>
 
           <p className="text-[0.7rem] leading-relaxed text-text-dim">

@@ -38,6 +38,17 @@ export default async function DocumentPage({
     .eq("id", documentId)
     .single();
 
+  // O controle de viúvas e órfãs veio depois, em migration própria
+  // (`20260807120000_document_widow_control`), então tem `select` próprio: junto
+  // com as margens, uma coluna faltando derrubaria a leitura das duas coisas e o
+  // documento abriria com a margem errada. Sem a coluna, fica desligado — que é
+  // o padrão dela.
+  const { data: widow } = await supabase
+    .from("documents")
+    .select("widow_control")
+    .eq("id", documentId)
+    .single();
+
   return (
     <DocumentEditor
       documentId={document.id}
@@ -58,6 +69,7 @@ export default async function DocumentPage({
               },
               lineHeight:
                 pageSetup.line_height === null ? null : Number(pageSetup.line_height),
+              widowControl: widow?.widow_control === true,
             }
           : null
       }

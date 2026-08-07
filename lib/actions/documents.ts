@@ -89,6 +89,8 @@ export async function updateDocumentPageSetup(
     marginLeft: number;
     /** `null` = a entrelinha padrão do editor, que é o que o documento já tinha. */
     lineHeight: number | null;
+    /** Duas linhas do mesmo parágrafo de cada lado da virada. Ver `PageSetup`. */
+    widowControl: boolean;
   },
 ) {
   const cm = (v: number, max: number) =>
@@ -106,6 +108,7 @@ export async function updateDocumentPageSetup(
         setup.lineHeight === null || !Number.isFinite(setup.lineHeight)
           ? null
           : Math.min(Math.max(setup.lineHeight, 0.5), 3),
+      widow_control: setup.widowControl === true,
     })
     .eq("id", documentId);
 }

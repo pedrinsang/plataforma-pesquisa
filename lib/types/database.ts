@@ -178,6 +178,7 @@ export interface Database {
           margin_bottom: number;
           margin_left: number;
           line_height: number | null;
+          widow_control: boolean;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -196,6 +197,7 @@ export interface Database {
           margin_bottom?: number;
           margin_left?: number;
           line_height?: number | null;
+          widow_control?: boolean;
           created_by: string;
         };
         Update: {
@@ -210,6 +212,7 @@ export interface Database {
           margin_bottom?: number;
           margin_left?: number;
           line_height?: number | null;
+          widow_control?: boolean;
         };
         Relationships: [
           {

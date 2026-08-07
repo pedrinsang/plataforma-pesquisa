@@ -23,16 +23,10 @@ import {
   SPACER_SELECTOR,
   type PageSpacer,
 } from "@/lib/writing/extensions/pagination";
+import { breakAtLine, MIN_LINES } from "@/lib/writing/pagination-rules";
 
 /** Tolerância de medição (subpixel) antes de considerar que um bloco transbordou. */
 const EPS = 0.5;
-
-/**
- * Mínimo de linhas de um mesmo parágrafo que ficam juntas de cada lado da
- * virada — controle de viúvas e órfãs, como num processador de texto. Quando não
- * dá para respeitar dos dois lados, o parágrafo inteiro desce.
- */
-const MIN_LINES = 2;
 
 /**
  * Blocos que podem ser repartidos entre duas folhas. Título não parte (fica com
@@ -85,6 +79,52 @@ function isSpacer(el: Element): boolean {
 function signature(spacers: PageSpacer[]): string {
   return spacers.map((s) => `${s.pos}:${s.inline ? "i" : "b"}:${Math.round(s.height)}`).join("|");
 }
+
+/** Um plano já tentado nesta rodada de medição. */
+type Attempt = { sig: string; spacers: PageSpacer[]; pageCount: number };
+
+/**
+ * Escolha determinística quando a medição entra em ciclo (aplicar A leva a medir
+ * B, e B de volta a A). Antes o desenho simplesmente congelava no que estivesse
+ * aplicado no instante em que o ciclo foi notado — ou seja, no plano que a
+ * última passada tinha acabado de escrever, que tanto podia ser A quanto B.
+ * Era daí que vinha a paginação "difícil de voltar": o texto já tinha sido
+ * desfeito, mas o desenho ficava preso no plano perdedor até a próxima edição.
+ *
+ * O critério é o mesmo de um processador de texto: menos páginas ganha (é o
+ * plano que aproveita melhor a folha) e, em empate, a assinatura menor — que
+ * não significa nada em si, mas é **estável**, e estabilidade é o ponto.
+ */
+function bestAttempt(attempts: Attempt[]): Attempt | null {
+  let best: Attempt | null = null;
+  for (const attempt of attempts) {
+    if (
+      !best ||
+      attempt.pageCount < best.pageCount ||
+      (attempt.pageCount === best.pageCount && attempt.sig < best.sig)
+    ) {
+      best = attempt;
+    }
+  }
+  return best;
+}
+
+/**
+ * O que a medição fez na última passada. Serve ao banco de ensaio
+ * (`/dev/pagination`) — um ciclo de medição não deixa rastro na tela além do
+ * piscar, então sem isto ele só é diagnosticável no olho.
+ */
+export type PaginationDiagnostics = {
+  /** Planos distintos tentados desde a última mudança de conteúdo. */
+  passes: number;
+  /** A medição repetiu um plano: aplicar A leva a B e B de volta a A. */
+  cycle: boolean;
+  /** Estourou o orçamento de passadas sem convergir. */
+  exhausted: boolean;
+  /** Espaçadores do plano em vigor. */
+  spacers: PageSpacer[];
+  pageCount: number;
+};
 
 /**
  * Uma linha visual de um bloco, em coordenadas naturais do fluxo.
@@ -376,6 +416,7 @@ function planPages(
   editor: Editor,
   entries: Entry[],
   contentHeight: number,
+  minLines: number,
 ): { spacers: PageSpacer[]; pageCount: number } {
   const spacers: PageSpacer[] = [];
   // Vão total já reservado acima do ponto que está sendo examinado. A posição
@@ -404,7 +445,7 @@ function planPages(
 
     if (overflows(top)) {
       if (entry.lines && entry.lines.length > 1) {
-        offset += splitEntry(editor, entry, offset, spacers, contentHeight);
+        offset += splitEntry(editor, entry, offset, spacers, contentHeight, minLines);
       } else if (fitsInOnePage) {
         const push = sheetTop(pageOfFlowY(top) + 1) - top;
         if (push > EPS) {
@@ -418,7 +459,7 @@ function planPages(
     }
 
     if (KEEP_WITH_NEXT.has(entry.type)) {
-      const push = keepWithNextPush(entries, index, top, offset, contentHeight);
+      const push = keepWithNextPush(entries, index, top, offset, contentHeight, minLines);
       if (push > EPS) {
         spacers.push({ pos: entry.pos, height: push });
         offset += push;
@@ -440,11 +481,11 @@ function planPages(
  * então o requisito é o mesmo que o `splitEntry` aplica — `MIN_LINES` do
  * primeiro parágrafo, ou ele todo quando é curto demais para ser repartido.
  */
-function firstUnitBottom(entry: Entry): number {
+function firstUnitBottom(entry: Entry, minLines: number): number {
   const lines = entry.lines;
   if (!lines || lines.length === 0) return entry.naturalTop + entry.height;
   const [, end] = paraSpan(lines, 0);
-  const needed = end >= MIN_LINES * 2 ? MIN_LINES : end;
+  const needed = end >= minLines * 2 ? minLines : end;
   return lines[Math.min(needed, lines.length) - 1].bottom;
 }
 
@@ -463,6 +504,7 @@ function keepWithNextPush(
   top: number,
   offset: number,
   contentHeight: number,
+  minLines: number,
 ): number {
   const page = pageOfFlowY(top);
   if (top <= sheetTop(page) + EPS) return 0;
@@ -472,7 +514,7 @@ function keepWithNextPush(
   const after = entries[next];
   if (!after || after.isBreak) return 0;
 
-  const need = firstUnitBottom(after);
+  const need = firstUnitBottom(after, minLines);
   if (need - after.naturalTop > contentHeight) return 0;
   if (need + offset <= pageContentBottom(page, contentHeight) + EPS) return 0;
   return sheetTop(page + 1) - top;
@@ -509,6 +551,7 @@ function splitEntry(
   offsetIn: number,
   spacers: PageSpacer[],
   contentHeight: number,
+  minLines: number,
 ): number {
   const lines = entry.lines;
   if (!lines) return 0;
@@ -543,10 +586,11 @@ function splitEntry(
       continue;
     }
 
-    // Viúva e órfã: se a virada não deixa MIN_LINES dos dois lados, o parágrafo
-    // inteiro desce (é o que o Word faz com um item curto no pé da folha).
+    // Viúva e órfã — ver `breakAtLine`, que é onde a regra mora e onde ela é
+    // testada. Em resumo: primeiro tenta subir a quebra para caber `MIN_LINES`
+    // dos dois lados; só quando isso é impossível o parágrafo inteiro desce.
     const [paraStart, paraEnd] = paraSpan(lines, i);
-    let at = i - paraStart < MIN_LINES || paraEnd - i < MIN_LINES ? paraStart : i;
+    let at = breakAtLine({ paraStart, paraEnd, overflow: i, minLines });
 
     // O bloco todo desce só quando a virada é a primeira linha dele e ele ainda
     // não foi repartido — depois disso não há mais como subir.
@@ -634,9 +678,11 @@ export function WritingCanvas({
   header = "",
   footer = "",
   margins = DEFAULT_MARGINS,
+  widowControl = false,
   onPageCountChange,
   onCurrentPageChange,
   onViewport,
+  onDiagnostics,
 }: {
   editor: Editor | null;
   zoom: number;
@@ -648,10 +694,19 @@ export function WritingCanvas({
    * desenho, para que o papel nunca discorde da tela.
    */
   margins?: PageMargins;
+  /**
+   * Controle de linhas viúvas e órfãs. Ligado, exige `MIN_LINES` do mesmo
+   * parágrafo de cada lado da virada — rigor de norma, ao custo de um parágrafo
+   * curto descer inteiro (três linhas saltando de uma vez). Desligado (padrão),
+   * a quebra anda linha a linha. Ver `PageSetup.widowControl`.
+   */
+  widowControl?: boolean;
   onPageCountChange?: (count: number) => void;
   onCurrentPageChange?: (page: number) => void;
   /** Rolagem horizontal e largura da barra de rolagem, para alinhar a régua. */
   onViewport?: (v: { scrollLeft: number; gutter: number }) => void;
+  /** Rastro da medição — só o banco de ensaio (`/dev/pagination`) consome. */
+  onDiagnostics?: (d: PaginationDiagnostics) => void;
 }) {
   // Memoizado pelos quatro **números**, não pelo objeto: `paginate` depende da
   // geometria, e um objeto novo a cada render remontaria o agendamento da
@@ -669,7 +724,10 @@ export function WritingCanvas({
   const printRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<number | null>(null);
   // Planos já tentados desde a última mudança real de conteúdo/zoom/fonte.
-  const historyRef = useRef<string[]>([]);
+  const historyRef = useRef<Attempt[]>([]);
+  // Num ref para o `paginate` não ser refeito (e a medição não recomeçar) só
+  // porque o pai passou uma função nova.
+  const onDiagnosticsRef = useRef(onDiagnostics);
   const viewportRef = useRef({ scrollLeft: -1, gutter: -1 });
   const [pageCount, setPageCount] = useState(1);
   // O total de páginas é lido dentro de listeners; num ref ele não precisa
@@ -681,7 +739,22 @@ export function WritingCanvas({
     if (!editor || editor.isDestroyed) return;
     const entries = readEntries(editor, zoom, geo.contentHeight);
     if (!entries) return;
-    const { spacers, pageCount: next } = planPages(editor, entries, geo.contentHeight);
+    // Desligado, o mínimo é 1: a única quebra ainda proibida é a que não
+    // deixaria linha nenhuma em cima, que não é quebra e sim o parágrafo
+    // inteiro descendo.
+    const minLines = widowControl ? MIN_LINES : 1;
+    const { spacers, pageCount: next } = planPages(
+      editor,
+      entries,
+      geo.contentHeight,
+      minLines,
+    );
+
+    const report = (d: PaginationDiagnostics) => {
+      pageCountRef.current = d.pageCount;
+      setPageCount((prev) => (prev === d.pageCount ? prev : d.pageCount));
+      onDiagnosticsRef.current?.(d);
+    };
 
     // O que vale é o que o plugin tem aplicado, não uma cópia nossa: numa
     // edição ele remapeia os espaçadores por conta própria, e comparar com uma
@@ -690,24 +763,47 @@ export function WritingCanvas({
     const applied = paginationKey.getState(editor.state) ?? [];
     if (sameSpacers(applied, spacers)) {
       historyRef.current = [];
-      pageCountRef.current = next;
-      setPageCount((prev) => (prev === next ? prev : next));
+      report({ passes: 0, cycle: false, exhausted: false, spacers, pageCount: next });
       return;
     }
 
-    // Se este plano já foi tentado desde a última mudança de conteúdo, a
-    // medição está em ciclo (aplicar A leva a medir B, e B de volta a A). Ficar
-    // no desenho atual é o único desfecho estável — sem isto o editor alterna
-    // entre dois desenhos para sempre, o que é a "página piscando" e também o
-    // aviso de "Maximum update depth" (cada volta é um setState novo).
+    // Se este plano já foi tentado desde a última mudança de conteúdo, a medição
+    // está em ciclo (aplicar A leva a medir B, e B de volta a A) — continuar
+    // seria alternar entre dois desenhos para sempre, o que é a "página
+    // piscando" e também o aviso de "Maximum update depth" (cada volta é um
+    // setState novo). Mas parar não é ficar onde parou: aí a escolha entre os
+    // planos do ciclo é o acaso da passada em que ele foi notado. Escolhe-se o
+    // melhor entre os tentados e aplica-se **esse**, uma vez.
     const sig = signature(spacers);
-    if (historyRef.current.includes(sig) || historyRef.current.length >= MAX_PASSES) return;
-    historyRef.current.push(sig);
+    const tried = historyRef.current;
+    const repeated = tried.some((a) => a.sig === sig);
+    if (repeated || tried.length >= MAX_PASSES) {
+      const best = bestAttempt([...tried, { sig, spacers, pageCount: next }]);
+      if (!best) return;
+      report({
+        passes: tried.length,
+        cycle: repeated,
+        exhausted: !repeated,
+        spacers: best.spacers,
+        pageCount: best.pageCount,
+      });
+      // Reaplicar o mesmo plano é inócuo (o plugin devolve o valor anterior
+      // quando os espaçadores são iguais), então isto converge em vez de
+      // realimentar: a passada seguinte cai no `sameSpacers` acima.
+      if (!sameSpacers(applied, best.spacers)) editor.commands.setPageSpacers(best.spacers);
+      return;
+    }
+    tried.push({ sig, spacers, pageCount: next });
 
-    pageCountRef.current = next;
-    setPageCount((prev) => (prev === next ? prev : next));
+    report({
+      passes: tried.length,
+      cycle: false,
+      exhausted: false,
+      spacers,
+      pageCount: next,
+    });
     editor.commands.setPageSpacers(spacers);
-  }, [editor, zoom, geo]);
+  }, [editor, zoom, geo, widowControl]);
 
   // Agenda com timer (e não `requestAnimationFrame`): rAF não roda em aba de
   // segundo plano, e a paginação precisa ficar correta mesmo quando o documento
@@ -745,6 +841,10 @@ export function WritingCanvas({
       timerRef.current = null;
     };
   }, [editor, schedulePaginate]);
+
+  useEffect(() => {
+    onDiagnosticsRef.current = onDiagnostics;
+  }, [onDiagnostics]);
 
   useEffect(() => {
     onPageCountChange?.(pageCount);

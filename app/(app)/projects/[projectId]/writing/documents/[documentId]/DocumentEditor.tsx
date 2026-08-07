@@ -20,7 +20,7 @@ import { RulerBand } from "@/components/writing/WritingRuler";
 import { WritingStatusBar } from "@/components/writing/WritingStatusBar";
 import { SearchReplacePanel } from "@/components/writing/SearchReplacePanel";
 import { buildEditorExtensions } from "@/lib/writing/editor-extensions";
-import { DEFAULT_MARGINS, ZOOM_DEFAULT, type PageSetup } from "@/lib/writing/page-metrics";
+import { DEFAULT_PAGE_SETUP, ZOOM_DEFAULT, type PageSetup } from "@/lib/writing/page-metrics";
 import type { StatSourceKind } from "@/lib/writing/stat-sources";
 import {
   getReference,
@@ -93,7 +93,7 @@ export function DocumentEditor({
   // paginação (é a mesma geometria dos dois lados, senão o papel discorda da
   // tela); a entrelinha é uma variável CSS lida pelo `.folium-editor`.
   const [pageSetup, setPageSetup] = useState<PageSetup>(
-    initialPageSetup ?? { margins: DEFAULT_MARGINS, lineHeight: null },
+    initialPageSetup ?? DEFAULT_PAGE_SETUP,
   );
   const [goal, setGoal] = useState(initialWordGoal);
   const [wordCount, setWordCount] = useState(0);
@@ -243,6 +243,7 @@ export function DocumentEditor({
         marginBottom: next.margins.bottom,
         marginLeft: next.margins.left,
         lineHeight: next.lineHeight,
+        widowControl: next.widowControl,
       });
       setSaveStatus("saved");
     }, 800);
@@ -437,6 +438,7 @@ export function DocumentEditor({
             header={headerFooter.header}
             footer={headerFooter.footer}
             margins={pageSetup.margins}
+            widowControl={pageSetup.widowControl}
             onPageCountChange={setPageCount}
             onCurrentPageChange={setCurrentPage}
             onViewport={setViewport}

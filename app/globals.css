@@ -1363,13 +1363,27 @@ textarea.input { min-height: 90px; resize: vertical; }
 
 /* Espaçador da virada *dentro* de um parágrafo: é o que reparte o parágrafo
    entre duas folhas. Ocupa a largura inteira da coluna, então nunca divide uma
-   linha ao meio — cai sozinho numa caixa de linha e empurra o resto do texto
-   para a folha seguinte. `vertical-align: top` tira a entrelinha da conta, senão
-   a caixa ficaria mais alta que a altura medida e a paginação oscilaria. */
+   linha ao meio — não sobra espaço ao lado dele, e o resto do texto desce para
+   a folha seguinte.
+
+   É **float**, e não `inline-block`, por causa do cursor. Um inline-block de
+   300 px de altura forma uma caixa de linha de 300 px, e o navegador desenha o
+   caret com a altura da caixa de linha em que ele está: o cursor virava um
+   traço que ia do fim do parágrafo, atravessava o vão entre as folhas e entrava
+   na de baixo (e ficava na margem direita, que é onde o caret cai depois de um
+   inline-block de 100% de largura). O float sai do fluxo em linha — as caixas
+   de linha vizinhas voltam à altura da fonte, e o caret com elas.
+
+   `display: block` resolveria o caret do mesmo jeito, mas parte o parágrafo em
+   caixas anônimas: o texto depois da virada viraria "primeira linha" de novo e
+   receberia outra vez o recuo de primeira linha (`ParagraphIndent`) — que é
+   justamente o que a ABNT usa no corpo do texto. O float não cria caixa
+   anônima, então o recuo continua valendo só onde o parágrafo começou de fato. */
 .folium-line-spacer {
-  display: inline-block;
+  display: block;
+  float: left;
+  clear: both;
   width: 100%;
-  vertical-align: top;
   margin: 0;
   padding: 0;
   pointer-events: none;
